@@ -161,3 +161,70 @@ See LICENSE file for details.
 
 - Demucs by Facebook Research for the audio separation model
 - The open-source audio processing community
+
+## Troubleshooting
+
+### Services won't start
+
+**Problem**: Docker containers fail to start
+
+**Solutions**:
+- Ensure Docker is running: `docker info`
+- Check port availability: `lsof -i :3000,8080,5000` (on Unix)
+- Review logs: `docker compose logs`
+- Try rebuilding: `docker compose build --no-cache`
+
+### First run is slow
+
+**Problem**: Initial processing takes a very long time
+
+**Solution**: This is normal! On first run, Demucs downloads ~2GB of pre-trained models. Subsequent runs will be much faster.
+
+### Out of memory errors
+
+**Problem**: Container crashes with memory errors
+
+**Solutions**:
+- Increase Docker memory limit (8GB recommended)
+- Process shorter audio files
+- Reduce concurrent jobs
+
+### Audio quality issues
+
+**Problem**: Separated stems have artifacts or poor quality
+
+**Solutions**:
+- Use high-quality input files (WAV/FLAC preferred over MP3)
+- Ensure input file isn't corrupted
+- Try different Demucs models by modifying `processor/app.py`
+
+### Upload fails
+
+**Problem**: File upload returns an error
+
+**Solutions**:
+- Check file format is supported (mp3, wav, flac, ogg, m4a, aac)
+- Verify file size is under 100MB
+- Check disk space on host machine
+- Review backend logs: `docker compose logs backend`
+
+### Can't access frontend
+
+**Problem**: Browser can't connect to http://localhost:3000
+
+**Solutions**:
+- Verify frontend container is running: `docker compose ps`
+- Check for port conflicts: `lsof -i :3000`
+- Review frontend logs: `docker compose logs frontend`
+- Wait a minute - frontend may still be building
+
+### Backend API errors
+
+**Problem**: API requests fail
+
+**Solutions**:
+- Verify backend is healthy: `curl http://localhost:8080/api/health`
+- Check backend logs: `docker compose logs backend`
+- Ensure processor is running: `docker compose ps processor`
+
+For more issues, please check our [GitHub Issues](https://github.com/mbianchidev/track2stem/issues) page.
