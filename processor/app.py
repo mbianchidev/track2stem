@@ -45,11 +45,11 @@ def process_audio():
     
     try:
         # Run Demucs separation
-        # Using htdemucs model which separates into: drums, bass, other, vocals
+        # Using htdemucs_6s model which separates into: vocals, drums, bass, guitar, piano, other
         cmd = [
             'python', '-m', 'demucs',
             '-o', OUTPUT_FOLDER,
-            '-n', 'htdemucs',
+            '-n', 'htdemucs_6s',
             input_path
         ]
         
@@ -61,13 +61,13 @@ def process_audio():
                 'details': result.stderr
             }), 500
         
-        # Demucs creates: OUTPUT_FOLDER/htdemucs/filename_without_ext/stem.wav
+        # Demucs creates: OUTPUT_FOLDER/htdemucs_6s/filename_without_ext/stem.wav
         filename_no_ext = os.path.splitext(f"{job_id}_{filename}")[0]
-        demucs_output = os.path.join(OUTPUT_FOLDER, 'htdemucs', filename_no_ext)
+        demucs_output = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s', filename_no_ext)
         
         # Move files to job output directory and collect paths
         output_files = {}
-        stems = ['drums', 'bass', 'other', 'vocals']
+        stems = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']
         
         for stem in stems:
             src = os.path.join(demucs_output, f"{stem}.wav")
@@ -79,7 +79,7 @@ def process_audio():
         # Clean up demucs directory
         if os.path.exists(demucs_output):
             shutil.rmtree(demucs_output)
-        parent_dir = os.path.join(OUTPUT_FOLDER, 'htdemucs')
+        parent_dir = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s')
         if os.path.exists(parent_dir) and not os.listdir(parent_dir):
             os.rmdir(parent_dir)
         

@@ -1,7 +1,7 @@
 # Track2stem Implementation Summary
 
 ## Overview
-Track2stem is a complete music separation application that splits audio files into individual stems (vocals, drums, bass, and other instruments). This implementation fulfills all requirements specified in the problem statement.
+Track2stem is a complete music separation application that splits audio files into individual stems (vocals, drums, bass, guitar, piano, and other instruments). This implementation fulfills all requirements specified in the problem statement.
 
 ## Architecture
 
@@ -29,8 +29,8 @@ Track2stem is a complete music separation application that splits audio files in
 
 3. **Processor Service** (Python + Demucs)
    - Flask REST API for audio processing
-   - Facebook Research's Demucs (htdemucs model)
-   - 4-stem separation: vocals, drums, bass, other
+   - Facebook Research's Demucs (htdemucs_6s model)
+   - 6-stem separation: vocals, drums, bass, guitar, piano, other
    - Supports multiple formats: MP3, WAV, FLAC, OGG, M4A, AAC
    - Automatic model download on first run
    - Efficient file cleanup after processing
@@ -38,7 +38,7 @@ Track2stem is a complete music separation application that splits audio files in
 ## Features Implemented
 
 ✅ **Multi-format Support**: MP3, FLAC, WAV, OGG, M4A, AAC
-✅ **4-Stem Output**: Vocals, drums, bass, and other instruments
+✅ **6-Stem Output**: Vocals, drums, bass, guitar, piano, and other instruments
 ✅ **Docker Compose Architecture**: Easy deployment and orchestration
 ✅ **Golang Backend**: Fast, efficient REST API
 ✅ **React Frontend**: Modern, user-friendly interface
@@ -128,7 +128,7 @@ track2stem/
 6. Processor returns output file paths
 7. Backend updates job status to "completed"
 8. Frontend polls backend and displays download buttons
-9. User downloads individual stems (vocals, drums, bass, other)
+9. User downloads individual stems (vocals, drums, bass, guitar, piano, other)
 
 ## Development Workflow
 

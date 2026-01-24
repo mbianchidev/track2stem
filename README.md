@@ -1,12 +1,12 @@
 # Track2stem 🎵
 
-Turn any track into multi-stem with track2stem - a powerful music separator that splits audio files into individual stems (vocals, drums, bass, and other instruments).
+Turn any track into multi-stem with track2stem - a powerful music separator that splits audio files into individual stems (vocals, drums, bass, guitar, piano, and other instruments).
 
 ## Features
 
 - **Multi-format Support**: Upload MP3, WAV, FLAC, OGG, M4A, and AAC files
 - **AI-Powered Separation**: Uses Demucs for high-quality audio separation
-- **4-Stem Output**: Get separate tracks for vocals, drums, bass, and other instruments
+- **6-Stem Output**: Get separate tracks for vocals, drums, bass, guitar, piano, and other instruments
 - **Modern Architecture**: Docker Compose app with Go backend and React frontend
 - **Real-time Progress**: Track your jobs with live status updates
 - **Download Individual Stems**: Download each separated track independently
@@ -53,7 +53,7 @@ On the first run, Demucs will download pre-trained models (~2GB). This is a one-
 2. Click "Choose File" and select an audio file (mp3, wav, flac, etc.)
 3. Click "Upload & Process"
 4. Wait for the processing to complete (typically 1-5 minutes per song)
-5. Download individual stems (vocals, drums, bass, other)
+5. Download individual stems (vocals, drums, bass, guitar, piano, other)
 
 ## API Endpoints
 
@@ -85,6 +85,8 @@ Response: {
     "vocals": "/path/to/vocals.wav",
     "drums": "/path/to/drums.wav",
     "bass": "/path/to/bass.wav",
+    "guitar": "/path/to/guitar.wav",
+    "piano": "/path/to/piano.wav",
     "other": "/path/to/other.wav"
   }
 }
@@ -93,7 +95,7 @@ Response: {
 ### Download Stem
 ```bash
 GET /api/download/{job_id}/{stem}
-stem: vocals | drums | bass | other
+stem: vocals | drums | bass | guitar | piano | other
 
 Response: Audio file (WAV format)
 ```
