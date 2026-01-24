@@ -48,15 +48,6 @@ def process_audio():
         # Using htdemucs model which separates into: drums, bass, other, vocals
         cmd = [
             'python', '-m', 'demucs',
-            '--two-stems=vocals',  # Can change to full separation
-            '-o', OUTPUT_FOLDER,
-            '-n', 'htdemucs',
-            input_path
-        ]
-        
-        # For full 4-stem separation (drums, bass, other, vocals)
-        cmd = [
-            'python', '-m', 'demucs',
             '-o', OUTPUT_FOLDER,
             '-n', 'htdemucs',
             input_path

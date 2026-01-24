@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -30,7 +31,24 @@ type Job struct {
 var (
 	jobs      = make(map[string]*Job)
 	jobsMutex = &sync.RWMutex{}
+	// In-memory job storage: jobs are lost on container restart
+	// For production, consider using a database or persistent storage
 )
+
+// sanitizeFilename removes dangerous characters from filenames to prevent path traversal
+func sanitizeFilename(filename string) string {
+	// Remove any path separators
+	filename = filepath.Base(filename)
+	// Remove or replace dangerous characters
+	reg := regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+	filename = reg.ReplaceAllString(filename, "_")
+	// Limit length
+	if len(filename) > 255 {
+		ext := filepath.Ext(filename)
+		filename = filename[:255-len(ext)] + ext
+	}
+	return filename
+}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -91,10 +109,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	jobID := uuid.New().String()
+	safeFilename := sanitizeFilename(header.Filename)
 	job := &Job{
 		ID:        jobID,
 		Status:    "pending",
-		FileName:  header.Filename,
+		FileName:  safeFilename,
 		CreatedAt: time.Now(),
 	}
 
@@ -103,7 +122,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	jobsMutex.Unlock()
 
 	// Save file
-	uploadPath := filepath.Join("/app/uploads", jobID+"_"+header.Filename)
+	uploadPath := filepath.Join("/app/uploads", jobID+"_"+safeFilename)
 	dst, err := os.Create(uploadPath)
 	if err != nil {
 		job.Status = "failed"
