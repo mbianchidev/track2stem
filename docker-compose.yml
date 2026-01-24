@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: track2stem-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+      - outputs:/app/outputs
+    environment:
+      - PROCESSOR_URL=http://processor:5000
+      - PORT=8080
+    depends_on:
+      - processor
+    networks:
+      - track2stem-network
+
+  frontend:
+    build: ./frontend
+    container_name: track2stem-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - track2stem-network
+
+  processor:
+    build: ./processor
+    container_name: track2stem-processor
+    volumes:
+      - uploads:/app/uploads
+      - outputs:/app/outputs
+    environment:
+      - PORT=5000
+    networks:
+      - track2stem-network
+
+volumes:
+  uploads:
+  outputs:
+
+networks:
+  track2stem-network:
+    driver: bridge
