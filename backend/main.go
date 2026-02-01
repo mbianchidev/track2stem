@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,10 +79,44 @@ func main() {
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
+	// Get allowed origins from environment variable
+	// ALLOWED_ORIGINS can be a comma-separated list of allowed origins
+	// Default to "*" for development if not set
+	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOriginsEnv == "" {
+		allowedOriginsEnv = "*"
+	}
+
+	// Parse allowed origins once at startup for O(1) lookup
+	allowAll := allowedOriginsEnv == "*"
+	allowedOriginsMap := make(map[string]bool)
+	if !allowAll {
+		for _, origin := range strings.Split(allowedOriginsEnv, ",") {
+			trimmed := strings.TrimSpace(origin)
+			if trimmed != "" {
+				allowedOriginsMap[trimmed] = true
+			}
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		origin := r.Header.Get("Origin")
+		originAllowed := false
+
+		// Check if the origin is allowed
+		if allowAll {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			originAllowed = true
+		} else if origin != "" && allowedOriginsMap[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			originAllowed = true
+		}
+
+		// Only set other CORS headers if origin is allowed
+		if originAllowed {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		}
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
