@@ -1,116 +1,228 @@
+/* ===================================================================
+   Track2stem - Premium Audio Stem Separation Interface
+   Modern dark theme with professional audio production aesthetics
+   =================================================================== */
+
+/* Main App Container */
 .App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+    var(--color-bg-primary);
+  color: var(--color-text-primary);
+  position: relative;
 }
 
+/* Subtle grid pattern overlay */
+.App::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===================================================================
+   Header Section
+   =================================================================== */
 .App-header {
   text-align: center;
-  padding: 2rem 1rem;
-  background: rgba(0, 0, 0, 0.2);
+  padding: var(--space-2xl) var(--space-lg);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
+  border-bottom: 1px solid var(--color-border-primary);
+  position: relative;
+  z-index: 1;
 }
 
 .App-header h1 {
   margin: 0;
-  font-size: 3rem;
-  font-weight: bold;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-purple) 50%, var(--color-accent-secondary) 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 8s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .App-header p {
-  margin: 0.5rem 0 0;
-  font-size: 1.2rem;
-  opacity: 0.9;
+  margin: var(--space-sm) 0 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
 }
 
+/* ===================================================================
+   Main Content Area
+   =================================================================== */
 .App-main {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1100px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: var(--space-2xl) var(--space-lg);
+  position: relative;
+  z-index: 1;
 }
 
+/* ===================================================================
+   Upload Section
+   =================================================================== */
 .upload-section {
-  background: white;
-  color: #333;
-  border-radius: 1rem;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background: rgba(18, 20, 26, 0.85);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle glow effect on card */
+.upload-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-accent-primary), transparent);
+  opacity: 0.5;
 }
 
 .upload-section h2 {
-  margin-top: 0;
-  color: #667eea;
+  margin: 0 0 var(--space-lg);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.upload-section h2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.25em;
+  background: var(--color-accent-primary);
+  border-radius: var(--radius-full);
 }
 
 .upload-box {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-lg);
   align-items: center;
 }
 
+/* Custom file input styling */
 .upload-box input[type="file"] {
-  padding: 0.5rem;
-  border: 2px dashed #667eea;
-  border-radius: 0.5rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
+  padding: var(--space-lg);
+  border: 2px dashed var(--color-border-secondary);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.upload-box input[type="file"]:hover {
+  border-color: var(--color-accent-primary);
+  background: rgba(0, 212, 170, 0.05);
+}
+
+.upload-box input[type="file"]:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .file-name {
-  color: #667eea;
-  font-weight: 500;
+  color: var(--color-accent-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-md);
 }
 
-/* Stem Mode Options */
+/* ===================================================================
+   Stem Mode Options
+   =================================================================== */
 .stem-options {
   width: 100%;
-  max-width: 500px;
-  margin: 1rem 0;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 0.5rem;
+  max-width: 520px;
+  margin: var(--space-md) 0;
+  padding: var(--space-lg);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
 }
 
 .stem-options h3 {
-  margin: 0 0 0.75rem 0;
-  font-size: 1rem;
-  color: #333;
+  margin: 0 0 var(--space-md) 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .stem-mode-selector {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-md);
   flex-wrap: wrap;
 }
 
 .mode-option {
   flex: 1;
   min-width: 200px;
-  padding: 0.75rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 0.5rem;
+  padding: var(--space-md);
+  border: 2px solid var(--color-border-secondary);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-xs);
+  background: var(--color-bg-secondary);
 }
 
 .mode-option:hover {
-  border-color: #667eea;
+  border-color: var(--color-accent-primary);
+  background: rgba(0, 212, 170, 0.05);
 }
 
 .mode-option.selected {
-  border-color: #667eea;
-  background: #f0f4ff;
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-subtle);
+  box-shadow: 0 0 20px var(--color-accent-glow);
 }
 
 .mode-option input[type="radio"] {
@@ -119,50 +231,96 @@
 
 .mode-label {
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
+  font-size: 1rem;
 }
 
 .mode-desc {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
 }
 
 .isolate-selector {
-  margin-top: 0.75rem;
+  margin-top: var(--space-md);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border-primary);
 }
 
 .isolate-selector label {
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
 }
 
 .isolate-selector select {
-  padding: 0.5rem 1rem;
-  border: 2px solid #667eea;
-  border-radius: 0.5rem;
+  padding: var(--space-sm) var(--space-md);
+  border: 2px solid var(--color-border-secondary);
+  border-radius: var(--radius-md);
   font-size: 1rem;
-  background: white;
+  font-family: var(--font-body);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
+.isolate-selector select:hover {
+  border-color: var(--color-accent-primary);
+}
+
+.isolate-selector select:focus-visible {
+  border-color: var(--color-accent-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+/* ===================================================================
+   Upload Button
+   =================================================================== */
 .upload-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  position: relative;
+  background: var(--color-accent-primary);
+  color: var(--color-bg-primary);
   border: none;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
-  font-weight: bold;
-  border-radius: 0.5rem;
+  padding: var(--space-md) var(--space-2xl);
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+}
+
+.upload-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
 }
 
 .upload-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 25px var(--color-accent-glow);
+  background: var(--color-accent-secondary);
+}
+
+.upload-button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.upload-button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .upload-button:disabled {
@@ -170,165 +328,269 @@
   cursor: not-allowed;
 }
 
-.error {
-  color: #dc3545;
-  margin-top: 1rem;
-  font-weight: 500;
+/* ===================================================================
+   Progress Bars
+   =================================================================== */
+.progress-container {
+  width: 100%;
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: var(--space-sm);
 }
 
+.progress-container.large {
+  height: 12px;
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent-primary) 0%, var(--color-purple) 100%);
+  border-radius: inherit;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-bar.processing {
+  background: linear-gradient(90deg, var(--color-info) 0%, var(--color-accent-primary) 100%);
+  animation: none;
+}
+
+.progress-bar.processing::after {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ===================================================================
+   Error Messages
+   =================================================================== */
+.error {
+  color: var(--color-error);
+  margin-top: var(--space-md);
+  font-weight: 500;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-error-glow);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-error);
+}
+
+/* ===================================================================
+   Job Cards (Current Job & Jobs Section)
+   =================================================================== */
 .current-job,
 .jobs-section {
-  background: white;
-  color: #333;
-  border-radius: 1rem;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.current-job::before,
+.jobs-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-purple), transparent);
+  opacity: 0.5;
 }
 
 .current-job h2,
 .jobs-section h2 {
-  margin-top: 0;
-  color: #667eea;
+  margin: 0 0 var(--space-lg);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.current-job h2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.25em;
+  background: var(--color-success);
+  border-radius: var(--radius-full);
+}
+
+.jobs-section h2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.25em;
+  background: var(--color-purple);
+  border-radius: var(--radius-full);
 }
 
 .job-card,
 .job-card-small {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-primary);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
+  transition: all var(--transition-base);
+}
+
+.job-card:hover,
+.job-card-small:hover {
+  border-color: var(--color-border-secondary);
 }
 
 .job-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-md);
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .job-filename {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 1.1rem;
   word-break: break-word;
+  color: var(--color-text-primary);
 }
 
+/* ===================================================================
+   Status Badges
+   =================================================================== */
 .job-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .status-pending {
-  background: #ffc107;
-  color: #000;
+  background: rgba(234, 179, 8, 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(234, 179, 8, 0.3);
 }
 
 .status-processing {
-  background: #17a2b8;
-  color: white;
+  background: rgba(14, 165, 233, 0.15);
+  color: var(--color-info);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  animation: statusPulse 2s ease-in-out infinite;
 }
 
-.status-completed {
-  background: #28a745;
-  color: white;
-}
-
-.status-failed {
-  background: #dc3545;
-  color: white;
-}
-
-.job-id,
-.job-date {
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.processing-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 1.5rem;
-  background: #e3f2fd;
-  border-radius: 0.5rem;
-}
-
-.progress-container {
-  width: 100%;
-  height: 8px;
-  background: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 0.5rem;
-}
-
-.progress-container.large {
-  height: 20px;
-  border-radius: 10px;
-}
-
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.progress-bar.processing {
-  background: linear-gradient(90deg, #17a2b8 0%, #28a745 100%);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
+@keyframes statusPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
 
+.status-completed {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--color-success);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.job-id,
+.job-date {
+  margin: var(--space-xs) 0;
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* ===================================================================
+   Processing Indicator
+   =================================================================== */
+.processing-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+  padding: var(--space-lg);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(0, 212, 170, 0.08) 100%);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: var(--radius-lg);
+}
+
 .progress-text {
   font-weight: 600;
-  color: #17a2b8;
+  color: var(--color-info);
   margin: 0;
   text-align: center;
+  font-size: 0.95rem;
 }
 
 .processing-note {
-  font-size: 0.9rem;
-  color: #666;
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
   margin: 0;
   text-align: center;
+  line-height: 1.5;
 }
 
 .elapsed-time {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #17a2b8;
-  margin: 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-accent-primary);
+  margin: var(--space-xs) 0;
   text-align: center;
+  font-family: var(--font-mono);
 }
 
 .total-time {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #28a745;
-  margin: 0.5rem 0 1rem 0;
+  color: var(--color-success);
+  margin: var(--space-sm) 0 var(--space-md) 0;
   text-align: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-success-glow);
+  border-radius: var(--radius-md);
+  display: inline-block;
+  align-self: center;
 }
 
+/* ===================================================================
+   Spinner
+   =================================================================== */
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #667eea;
+  border: 3px solid var(--color-bg-tertiary);
+  border-top: 3px solid var(--color-accent-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -336,145 +598,214 @@
   100% { transform: rotate(360deg); }
 }
 
+/* ===================================================================
+   Stem Download Buttons
+   =================================================================== */
 .stems {
-  margin-top: 1.5rem;
+  margin-top: var(--space-lg);
 }
 
 .stems h3 {
-  color: #667eea;
-  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-md);
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .stem-buttons {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-md);
 }
 
 .stem-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 1rem;
-  border-radius: 0.5rem;
+  position: relative;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-secondary);
+  color: var(--color-text-primary);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
+  font-family: var(--font-body);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  transition: transform 0.2s;
+  gap: var(--space-xs);
+  transition: all var(--transition-base);
+  overflow: hidden;
+}
+
+.stem-button::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-accent-primary);
+  transform: scaleX(0);
+  transition: transform var(--transition-base);
 }
 
 .stem-button:hover {
+  border-color: var(--color-accent-primary);
+  background: rgba(0, 212, 170, 0.08);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.stem-button:hover::before {
+  transform: scaleX(1);
 }
 
 .stem-icon {
   font-size: 1.5rem;
+  filter: grayscale(0);
 }
+
+/* Stem-specific colors using data attributes for stable styling
+   (object key order from Go backend is not guaranteed) */
+.stem-button[data-stem="vocals"]:hover { border-color: var(--color-stem-vocals); }
+.stem-button[data-stem="vocals"]::before { background: var(--color-stem-vocals); }
+.stem-button[data-stem="drums"]:hover { border-color: var(--color-stem-drums); }
+.stem-button[data-stem="drums"]::before { background: var(--color-stem-drums); }
+.stem-button[data-stem="bass"]:hover { border-color: var(--color-stem-bass); }
+.stem-button[data-stem="bass"]::before { background: var(--color-stem-bass); }
+.stem-button[data-stem="guitar"]:hover { border-color: var(--color-stem-guitar); }
+.stem-button[data-stem="guitar"]::before { background: var(--color-stem-guitar); }
+.stem-button[data-stem="piano"]:hover { border-color: var(--color-stem-piano); }
+.stem-button[data-stem="piano"]::before { background: var(--color-stem-piano); }
+.stem-button[data-stem="other"]:hover { border-color: var(--color-stem-other); }
+.stem-button[data-stem="other"]::before { background: var(--color-stem-other); }
+.stem-button[data-stem="backing"]:hover { border-color: var(--color-stem-other); }
+.stem-button[data-stem="backing"]::before { background: var(--color-stem-other); }
 
 .stem-buttons-small {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   flex-wrap: wrap;
-  margin-top: 0.5rem;
+  margin-top: var(--space-sm);
 }
 
 .stem-button-small {
-  background: #667eea;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-secondary);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: background 0.2s;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: all var(--transition-fast);
+  text-transform: capitalize;
 }
 
 .stem-button-small:hover {
-  background: #764ba2;
+  background: var(--color-accent-primary);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent-primary);
 }
 
 .jobs-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
+/* ===================================================================
+   Footer
+   =================================================================== */
 .App-footer {
   text-align: center;
-  padding: 2rem 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  font-size: 0.9rem;
-  opacity: 0.8;
+  padding: var(--space-xl) var(--space-lg);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-primary);
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+  position: relative;
+  z-index: 1;
 }
 
-/* Spectrogram/Waveform styles */
+.App-footer p {
+  margin: 0;
+}
+
+/* ===================================================================
+   Spectrogram/Waveform Styles
+   =================================================================== */
 .spectrogram-container {
   width: 100%;
-  margin: 0.5rem 0;
+  margin: var(--space-sm) 0;
 }
 
 .spectrogram-title {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #667eea;
-  margin: 0 0 0.25rem 0;
+  color: var(--color-accent-primary);
+  margin: 0 0 var(--space-xs) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .spectrogram-canvas {
   width: 100%;
   max-width: 600px;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  background: #0a0a1a;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-primary);
 }
 
 .spectrogram-loading {
-  padding: 1rem;
+  padding: var(--space-md);
   text-align: center;
-  color: #666;
+  color: var(--color-text-tertiary);
   font-size: 0.9rem;
 }
 
 .spectrogram-error {
-  padding: 0.5rem;
+  padding: var(--space-sm);
   text-align: center;
-  color: #dc3545;
+  color: var(--color-error);
   font-size: 0.85rem;
 }
 
 .input-spectrogram {
   width: 100%;
   max-width: 500px;
-  margin: 0.5rem 0;
+  margin: var(--space-sm) 0;
 }
 
 .output-spectrograms {
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border-primary);
 }
 
 .output-spectrograms h3 {
-  color: #667eea;
-  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-md);
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .spectrograms-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
-/* Section header with clear button */
+/* ===================================================================
+   Section Header with Clear Button
+   =================================================================== */
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-lg);
 }
 
 .section-header h2 {
@@ -482,34 +813,40 @@
 }
 
 .clear-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.2s;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: all var(--transition-fast);
 }
 
 .clear-button:hover {
-  background: #c82333;
+  background: var(--color-error);
+  color: white;
 }
 
-/* Job header right side with time and delete */
+/* ===================================================================
+   Job Header Right Side
+   =================================================================== */
 .job-header-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .job-time {
-  font-size: 0.85rem;
-  color: #28a745;
+  font-size: 0.8rem;
+  color: var(--color-success);
   font-weight: 600;
-  background: #e8f5e9;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
+  background: var(--color-success-glow);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
 }
 
 .delete-job-button {
@@ -517,28 +854,42 @@
   border: none;
   cursor: pointer;
   font-size: 1rem;
-  padding: 0.25rem;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+  padding: var(--space-xs);
+  opacity: 0.5;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
 .delete-job-button:hover {
   opacity: 1;
+  background: var(--color-error-glow);
 }
 
+/* ===================================================================
+   Responsive Design
+   =================================================================== */
 @media (max-width: 768px) {
+  .App-header {
+    padding: var(--space-xl) var(--space-md);
+  }
+  
   .App-header h1 {
     font-size: 2rem;
+  }
+
+  .App-main {
+    padding: var(--space-lg) var(--space-md);
   }
 
   .upload-section,
   .current-job,
   .jobs-section {
-    padding: 1rem;
+    padding: var(--space-lg);
+    border-radius: var(--radius-lg);
   }
 
   .stem-buttons {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .spectrograms-grid {
@@ -548,5 +899,29 @@
   .job-header-right {
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+  
+  .stem-mode-selector {
+    flex-direction: column;
+  }
+  
+  .mode-option {
+    min-width: auto;
+  }
+  
+  .isolate-selector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .stem-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .upload-button {
+    width: 100%;
+    max-width: 320px;
   }
 }

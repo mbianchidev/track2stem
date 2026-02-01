@@ -480,6 +480,7 @@ function App() {
                         key={stem}
                         onClick={() => handleDownload(currentJob.id, stem)}
                         className="stem-button"
+                        data-stem={stem}
                       >
                         <span className="stem-icon">🎼</span>
                         {stem.charAt(0).toUpperCase() + stem.slice(1)}
