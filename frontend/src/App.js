@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 import Spectrogram from './Spectrogram';
@@ -23,7 +23,6 @@ function App() {
   const [stemMode, setStemMode] = useState('all'); // 'all' or 'isolate'
   const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
   const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
-  const [inputFileName, setInputFileName] = useState(''); // Keep track of input file name for display
   const [isInitialized, setIsInitialized] = useState(false); // Track if localStorage has been loaded
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
@@ -76,12 +75,6 @@ function App() {
       }
     }
     
-    // Load input file name
-    const savedInputFileName = localStorage.getItem(STORAGE_KEYS.INPUT_FILE_NAME);
-    if (savedInputFileName) {
-      setInputFileName(savedInputFileName);
-    }
-    
     // Mark as initialized after loading
     setIsInitialized(true);
   }, []);
@@ -102,10 +95,43 @@ function App() {
 
   // Fetch jobs on mount and merge with localStorage (only after localStorage is loaded)
   useEffect(() => {
+    const doFetchJobs = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/jobs`);
+        const serverJobs = response.data || [];
+        
+        // Merge server jobs with localStorage jobs (localStorage takes precedence for completed jobs)
+        const savedJobsStr = localStorage.getItem(STORAGE_KEYS.JOBS);
+        const savedJobs = savedJobsStr ? JSON.parse(savedJobsStr) : [];
+        
+        // Create a map of all jobs
+        const jobsMap = new Map();
+        
+        // Add saved jobs first
+        savedJobs.forEach(job => {
+          jobsMap.set(job.id, job);
+        });
+        
+        // Update with server jobs (server has latest status)
+        serverJobs.forEach(job => {
+          const existing = jobsMap.get(job.id);
+          if (!existing || job.status === 'completed' || job.status === 'failed') {
+            jobsMap.set(job.id, job);
+          }
+        });
+        
+        const mergedJobs = Array.from(jobsMap.values());
+        setJobs(mergedJobs);
+        
+      } catch (err) {
+        console.error('Failed to fetch jobs:', err);
+      }
+    };
+
     if (isInitialized) {
-      fetchJobs();
+      doFetchJobs();
     }
-  }, [isInitialized]);
+  }, [isInitialized, API_BASE]);
 
   // Stopwatch effect - runs every second when processing
   useEffect(() => {
@@ -145,51 +171,8 @@ function App() {
     }
   }, [currentJob]);
 
-  useEffect(() => {
-    if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
-      const interval = setInterval(() => {
-        fetchJobStatus(currentJob.id);
-        fetchProcessingProgress(currentJob.id);
-      }, 2000);
-      return () => clearInterval(interval);
-    }
-    // Don't reset progress here - it causes the 90% issue
-  }, [currentJob]);
-
-  const fetchJobs = async () => {
-    try {
-      const response = await axios.get(`${API_BASE}/jobs`);
-      const serverJobs = response.data || [];
-      
-      // Merge server jobs with localStorage jobs (localStorage takes precedence for completed jobs)
-      const savedJobsStr = localStorage.getItem(STORAGE_KEYS.JOBS);
-      const savedJobs = savedJobsStr ? JSON.parse(savedJobsStr) : [];
-      
-      // Create a map of all jobs
-      const jobsMap = new Map();
-      
-      // Add saved jobs first
-      savedJobs.forEach(job => {
-        jobsMap.set(job.id, job);
-      });
-      
-      // Update with server jobs (server has latest status)
-      serverJobs.forEach(job => {
-        const existing = jobsMap.get(job.id);
-        if (!existing || job.status === 'completed' || job.status === 'failed') {
-          jobsMap.set(job.id, job);
-        }
-      });
-      
-      const mergedJobs = Array.from(jobsMap.values());
-      setJobs(mergedJobs);
-      
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-    }
-  };
-
-  const fetchJobStatus = async (jobId) => {
+  // Fetch job status and progress polling
+  const fetchJobStatus = useCallback(async (jobId) => {
     try {
       const response = await axios.get(`${API_BASE}/jobs/${jobId}`);
       const updatedJob = response.data;
@@ -207,9 +190,9 @@ function App() {
     } catch (err) {
       console.error('Failed to fetch job status:', err);
     }
-  };
+  }, [API_BASE]);
 
-  const fetchProcessingProgress = async (jobId) => {
+  const fetchProcessingProgress = useCallback(async (jobId) => {
     try {
       const response = await axios.get(`${API_BASE}/processing-status/${jobId}`);
       if (response.data) {
@@ -220,7 +203,18 @@ function App() {
     } catch (err) {
       // Silently ignore - progress endpoint may not be available
     }
-  };
+  }, [API_BASE]);
+
+  useEffect(() => {
+    if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
+      const interval = setInterval(() => {
+        fetchJobStatus(currentJob.id);
+        fetchProcessingProgress(currentJob.id);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+    // Don't reset progress here - it causes the 90% issue
+  }, [currentJob, fetchJobStatus, fetchProcessingProgress]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -254,8 +248,7 @@ function App() {
     setUploadProgress(0);
     setError('');
     
-    // Save input file name for display during processing
-    setInputFileName(file.name);
+    // Save input file name to localStorage
     localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, file.name);
     
     // Reset timer for new job
@@ -322,7 +315,6 @@ function App() {
     if (currentJob && currentJob.id === jobId) {
       setCurrentJob(null);
       setProcessingProgress({ progress: 0, stage: '' });
-      setInputFileName('');
       localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
       localStorage.removeItem(STORAGE_KEYS.PROCESSING_PROGRESS);
       localStorage.removeItem(STORAGE_KEYS.INPUT_FILE_NAME);
@@ -335,7 +327,6 @@ function App() {
   const handleClearCurrentJob = () => {
     setCurrentJob(null);
     setProcessingProgress({ progress: 0, stage: '' });
-    setInputFileName('');
     localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
     localStorage.removeItem(STORAGE_KEYS.START_TIME);
     localStorage.removeItem(STORAGE_KEYS.PROCESSING_PROGRESS);
