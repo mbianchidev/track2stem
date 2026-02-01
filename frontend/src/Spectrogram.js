@@ -39,12 +39,12 @@ const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
         const canvasHeight = canvas.height;
         const centerY = canvasHeight / 2;
         
-        // Clear canvas with dark background
-        ctx.fillStyle = '#0a0a1a';
+        // Clear canvas with dark background matching theme
+        ctx.fillStyle = '#0a0b0f';
         ctx.fillRect(0, 0, width, canvasHeight);
         
         // Draw center line
-        ctx.strokeStyle = 'rgba(100, 100, 120, 0.3)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, centerY);
@@ -54,13 +54,13 @@ const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
         // Calculate samples per pixel
         const samplesPerPixel = Math.floor(channelData.length / width);
         
-        // Create gradient for waveform
+        // Create gradient for waveform - matching cyan/teal accent theme
         const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-        gradient.addColorStop(0, '#4da6ff');
-        gradient.addColorStop(0.3, '#66b3ff');
-        gradient.addColorStop(0.5, '#80bfff');
-        gradient.addColorStop(0.7, '#66b3ff');
-        gradient.addColorStop(1, '#4da6ff');
+        gradient.addColorStop(0, '#00d4aa');
+        gradient.addColorStop(0.3, '#00e5b8');
+        gradient.addColorStop(0.5, '#00f5c4');
+        gradient.addColorStop(0.7, '#00e5b8');
+        gradient.addColorStop(1, '#00d4aa');
         
         ctx.fillStyle = gradient;
         
