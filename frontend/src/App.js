@@ -100,10 +100,12 @@ function App() {
     }
   }, [currentJob]);
 
-  // Fetch jobs on mount and merge with localStorage
+  // Fetch jobs on mount and merge with localStorage (only after localStorage is loaded)
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    if (isInitialized) {
+      fetchJobs();
+    }
+  }, [isInitialized]);
 
   // Stopwatch effect - runs every second when processing
   useEffect(() => {

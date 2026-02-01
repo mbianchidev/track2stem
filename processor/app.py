@@ -415,7 +415,8 @@ def process_audio():
         logger.info("Demucs completed successfully, organizing output files...")
         
         # Demucs creates: OUTPUT_FOLDER/htdemucs_6s/filename_without_ext/stem.mp3 (or .wav)
-        filename_no_ext = os.path.splitext(f"{job_id}_{filename}")[0]
+        # Use the original filename with job_id prefix consistently
+        filename_no_ext = os.path.splitext(f"{job_id}_{original_filename}")[0]
         demucs_output = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s', filename_no_ext)
         
         logger.info(f"Looking for output in: {demucs_output}")
@@ -483,7 +484,8 @@ def process_audio():
                     ffmpeg_cmd.extend(['-i', f])
                 
                 # Create filter to mix all inputs
-                filter_complex = f"amix=inputs={len(stem_files)}:duration=longest:normalize=0"
+                # Use normalize=1 to properly normalize the mixed output and prevent clipping
+                filter_complex = f"amix=inputs={len(stem_files)}:duration=longest:normalize=1"
                 ffmpeg_cmd.extend(['-filter_complex', filter_complex])
                 
                 # Output settings
