@@ -470,7 +470,7 @@ function App() {
                     ></div>
                   </div>
                   <p className="progress-text">
-                    {processingProgress.stage || 'Starting processing...'} ({processingProgress.progress || 0}%)
+                    {processingProgress.stage || 'Starting processing...'}
                   </p>
                   <p className="elapsed-time">⏱️ Elapsed: {formatElapsedTime(elapsedTime)}</p>
                   <p className="processing-note">🎧 AI is separating your audio stems. This may take 5-15 minutes depending on file size.</p>

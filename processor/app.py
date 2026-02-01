@@ -297,7 +297,7 @@ def process_audio():
                                 pct = int(progress_match.group(1))
                                 # Map demucs 0-100% to our 10-90%
                                 mapped = 10 + int(pct * 0.80)
-                                update_progress(mapped, f'Separating stems... {pct}%')
+                                update_progress(mapped, f'Separating stems... ({mapped}%)')
                             except (ValueError, IndexError):
                                 pass
                         else:
@@ -313,7 +313,7 @@ def process_audio():
                                         if total > 0:
                                             pct = int((curr / total) * 100)
                                             mapped = 10 + int(pct * 0.80)
-                                            update_progress(mapped, f'Processing track {curr}/{total}...')
+                                            update_progress(mapped, f'Processing track {curr}/{total}... ({mapped}%)')
                                     except:
                                         pass
                                         
@@ -351,7 +351,7 @@ def process_audio():
                         processing_status[job_id] = {
                             'status': 'processing',
                             'progress': time_progress,
-                            'stage': f'Processing audio... ({format_elapsed(elapsed)})',
+                            'stage': f'Processing audio... ({time_progress}%)',
                             'elapsed': format_elapsed(elapsed)
                         }
                 
