@@ -660,19 +660,19 @@
   filter: grayscale(0);
 }
 
-/* Stem-specific colors */
-.stem-button:nth-child(1):hover { border-color: #ff6b9d; }
-.stem-button:nth-child(1)::before { background: #ff6b9d; }
-.stem-button:nth-child(2):hover { border-color: #ffa726; }
-.stem-button:nth-child(2)::before { background: #ffa726; }
-.stem-button:nth-child(3):hover { border-color: #66bb6a; }
-.stem-button:nth-child(3)::before { background: #66bb6a; }
-.stem-button:nth-child(4):hover { border-color: #42a5f5; }
-.stem-button:nth-child(4)::before { background: #42a5f5; }
-.stem-button:nth-child(5):hover { border-color: #ab47bc; }
-.stem-button:nth-child(5)::before { background: #ab47bc; }
-.stem-button:nth-child(6):hover { border-color: #78909c; }
-.stem-button:nth-child(6)::before { background: #78909c; }
+/* Stem-specific colors using CSS variables */
+.stem-button:nth-child(1):hover { border-color: var(--color-stem-vocals); }
+.stem-button:nth-child(1)::before { background: var(--color-stem-vocals); }
+.stem-button:nth-child(2):hover { border-color: var(--color-stem-drums); }
+.stem-button:nth-child(2)::before { background: var(--color-stem-drums); }
+.stem-button:nth-child(3):hover { border-color: var(--color-stem-bass); }
+.stem-button:nth-child(3)::before { background: var(--color-stem-bass); }
+.stem-button:nth-child(4):hover { border-color: var(--color-stem-guitar); }
+.stem-button:nth-child(4)::before { background: var(--color-stem-guitar); }
+.stem-button:nth-child(5):hover { border-color: var(--color-stem-piano); }
+.stem-button:nth-child(5)::before { background: var(--color-stem-piano); }
+.stem-button:nth-child(6):hover { border-color: var(--color-stem-other); }
+.stem-button:nth-child(6)::before { background: var(--color-stem-other); }
 
 .stem-buttons-small {
   display: flex;

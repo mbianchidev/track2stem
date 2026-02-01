@@ -21,6 +21,14 @@
   --color-orange: #f97316;
   --color-yellow: #eab308;
   
+  /* Stem-specific Colors (for download buttons) */
+  --color-stem-vocals: #ff6b9d;
+  --color-stem-drums: #ffa726;
+  --color-stem-bass: #66bb6a;
+  --color-stem-guitar: #42a5f5;
+  --color-stem-piano: #ab47bc;
+  --color-stem-other: #78909c;
+  
   /* Status Colors */
   --color-success: #22c55e;
   --color-success-glow: rgba(34, 197, 94, 0.2);
