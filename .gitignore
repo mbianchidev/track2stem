@@ -5,6 +5,7 @@ backend/vendor/
 # Build outputs
 frontend/build/
 backend/main
+backend/backend
 
 # Uploads and outputs
 uploads/
