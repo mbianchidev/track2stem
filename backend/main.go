@@ -19,13 +19,16 @@ import (
 )
 
 type Job struct {
-	ID          string            `json:"id"`
-	Status      string            `json:"status"` // pending, processing, completed, failed
-	FileName    string            `json:"filename"`
-	CreatedAt   time.Time         `json:"created_at"`
-	CompletedAt *time.Time        `json:"completed_at,omitempty"`
-	Error       string            `json:"error,omitempty"`
-	OutputFiles map[string]string `json:"output_files,omitempty"`
+	ID             string            `json:"id"`
+	Status         string            `json:"status"` // pending, processing, completed, failed
+	FileName       string            `json:"filename"`
+	CreatedAt      time.Time         `json:"created_at"`
+	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
+	Error          string            `json:"error,omitempty"`
+	OutputFiles    map[string]string `json:"output_files,omitempty"`
+	StemMode       string            `json:"stem_mode,omitempty"`       // "all" or "isolate"
+	IsolateStem    string            `json:"isolate_stem,omitempty"`    // which stem to isolate
+	ProcessingTime string            `json:"processing_time,omitempty"` // total processing time
 }
 
 var (
@@ -108,14 +111,26 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// Get stem options from form
+	stemMode := r.FormValue("stem_mode")
+	if stemMode == "" {
+		stemMode = "all"
+	}
+	isolateStem := r.FormValue("isolate_stem")
+	if isolateStem == "" {
+		isolateStem = "vocals"
+	}
+
 	// Create job
 	jobID := uuid.New().String()
 	safeFilename := sanitizeFilename(header.Filename)
 	job := &Job{
-		ID:        jobID,
-		Status:    "pending",
-		FileName:  safeFilename,
-		CreatedAt: time.Now(),
+		ID:          jobID,
+		Status:      "pending",
+		FileName:    safeFilename,
+		CreatedAt:   time.Now(),
+		StemMode:    stemMode,
+		IsolateStem: isolateStem,
 	}
 
 	jobsMutex.Lock()
@@ -141,13 +156,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start processing in background
-	go processJob(jobID, uploadPath)
+	go processJob(jobID, uploadPath, stemMode, isolateStem)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(job)
 }
 
-func processJob(jobID, filePath string) {
+func processJob(jobID, filePath, stemMode, isolateStem string) {
 	jobsMutex.Lock()
 	job := jobs[jobID]
 	job.Status = "processing"
@@ -183,8 +198,10 @@ func processJob(jobID, filePath string) {
 		return
 	}
 
-	// Add job_id field
+	// Add job_id and stem options
 	writer.WriteField("job_id", jobID)
+	writer.WriteField("stem_mode", stemMode)
+	writer.WriteField("isolate_stem", isolateStem)
 	writer.Close()
 
 	// Send request
@@ -221,6 +238,11 @@ func processJob(jobID, filePath string) {
 	job.Status = "completed"
 	now := time.Now()
 	job.CompletedAt = &now
+
+	// Extract processing time
+	if processingTime, ok := result["processing_time"].(string); ok {
+		job.ProcessingTime = processingTime
+	}
 
 	// Extract output files
 	if outputs, ok := result["outputs"].(map[string]interface{}); ok {

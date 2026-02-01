@@ -10,6 +10,8 @@ function App() {
   const [processingProgress, setProcessingProgress] = useState({ progress: 0, stage: '' });
   const [jobs, setJobs] = useState([]);
   const [error, setError] = useState('');
+  const [stemMode, setStemMode] = useState('all'); // 'all' or 'isolate'
+  const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
 
   const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
@@ -87,6 +89,8 @@ function App() {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('stem_mode', stemMode);
+    formData.append('isolate_stem', isolateStem);
 
     setUploading(true);
     setUploadProgress(0);
@@ -142,6 +146,55 @@ function App() {
               disabled={uploading}
             />
             {file && <p className="file-name">Selected: {file.name}</p>}
+            
+            {/* Stem Mode Options */}
+            <div className="stem-options">
+              <h3>Output Mode</h3>
+              <div className="stem-mode-selector">
+                <label className={`mode-option ${stemMode === 'all' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="stemMode"
+                    value="all"
+                    checked={stemMode === 'all'}
+                    onChange={(e) => setStemMode(e.target.value)}
+                    disabled={uploading}
+                  />
+                  <span className="mode-label">🎼 All 6 Stems</span>
+                  <span className="mode-desc">Vocals, Drums, Bass, Guitar, Piano, Other</span>
+                </label>
+                <label className={`mode-option ${stemMode === 'isolate' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="stemMode"
+                    value="isolate"
+                    checked={stemMode === 'isolate'}
+                    onChange={(e) => setStemMode(e.target.value)}
+                    disabled={uploading}
+                  />
+                  <span className="mode-label">🎤 Isolate One</span>
+                  <span className="mode-desc">Get one stem + everything else (great for covers)</span>
+                </label>
+              </div>
+              
+              {stemMode === 'isolate' && (
+                <div className="isolate-selector">
+                  <label>Choose stem to isolate:</label>
+                  <select 
+                    value={isolateStem} 
+                    onChange={(e) => setIsolateStem(e.target.value)}
+                    disabled={uploading}
+                  >
+                    <option value="vocals">🎤 Vocals</option>
+                    <option value="drums">🥁 Drums</option>
+                    <option value="bass">🎸 Bass</option>
+                    <option value="guitar">🎸 Guitar</option>
+                    <option value="piano">🎹 Piano</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            
             <button
               onClick={handleUpload}
               disabled={!file || uploading}
@@ -182,12 +235,18 @@ function App() {
                   <p className="progress-text">
                     {processingProgress.stage || 'Starting processing...'} ({processingProgress.progress || 0}%)
                   </p>
+                  {processingProgress.elapsed && (
+                    <p className="elapsed-time">⏱️ Elapsed: {processingProgress.elapsed}</p>
+                  )}
                   <p className="processing-note">🎧 AI is separating your audio stems. This may take 5-15 minutes depending on file size.</p>
                 </div>
               )}
 
               {currentJob.status === 'completed' && currentJob.output_files && (
                 <div className="stems">
+                  {currentJob.processing_time && (
+                    <p className="total-time">✅ Processed in {currentJob.processing_time}</p>
+                  )}
                   <h3>Download Stems:</h3>
                   <div className="stem-buttons">
                     {Object.keys(currentJob.output_files).map((stem) => (
