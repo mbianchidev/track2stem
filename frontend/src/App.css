@@ -87,13 +87,14 @@
    Upload Section
    =================================================================== */
 .upload-section {
-  background: var(--color-bg-secondary);
+  background: rgba(18, 20, 26, 0.85);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--color-border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
   margin-bottom: var(--space-xl);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(20px);
   position: relative;
   overflow: hidden;
 }
@@ -267,10 +268,14 @@
   transition: all var(--transition-fast);
 }
 
-.isolate-selector select:hover,
-.isolate-selector select:focus {
+.isolate-selector select:hover {
+  border-color: var(--color-accent-primary);
+}
+
+.isolate-selector select:focus-visible {
   border-color: var(--color-accent-primary);
   outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 /* ===================================================================
@@ -660,19 +665,22 @@
   filter: grayscale(0);
 }
 
-/* Stem-specific colors using CSS variables */
-.stem-button:nth-child(1):hover { border-color: var(--color-stem-vocals); }
-.stem-button:nth-child(1)::before { background: var(--color-stem-vocals); }
-.stem-button:nth-child(2):hover { border-color: var(--color-stem-drums); }
-.stem-button:nth-child(2)::before { background: var(--color-stem-drums); }
-.stem-button:nth-child(3):hover { border-color: var(--color-stem-bass); }
-.stem-button:nth-child(3)::before { background: var(--color-stem-bass); }
-.stem-button:nth-child(4):hover { border-color: var(--color-stem-guitar); }
-.stem-button:nth-child(4)::before { background: var(--color-stem-guitar); }
-.stem-button:nth-child(5):hover { border-color: var(--color-stem-piano); }
-.stem-button:nth-child(5)::before { background: var(--color-stem-piano); }
-.stem-button:nth-child(6):hover { border-color: var(--color-stem-other); }
-.stem-button:nth-child(6)::before { background: var(--color-stem-other); }
+/* Stem-specific colors using data attributes for stable styling
+   (object key order from Go backend is not guaranteed) */
+.stem-button[data-stem="vocals"]:hover { border-color: var(--color-stem-vocals); }
+.stem-button[data-stem="vocals"]::before { background: var(--color-stem-vocals); }
+.stem-button[data-stem="drums"]:hover { border-color: var(--color-stem-drums); }
+.stem-button[data-stem="drums"]::before { background: var(--color-stem-drums); }
+.stem-button[data-stem="bass"]:hover { border-color: var(--color-stem-bass); }
+.stem-button[data-stem="bass"]::before { background: var(--color-stem-bass); }
+.stem-button[data-stem="guitar"]:hover { border-color: var(--color-stem-guitar); }
+.stem-button[data-stem="guitar"]::before { background: var(--color-stem-guitar); }
+.stem-button[data-stem="piano"]:hover { border-color: var(--color-stem-piano); }
+.stem-button[data-stem="piano"]::before { background: var(--color-stem-piano); }
+.stem-button[data-stem="other"]:hover { border-color: var(--color-stem-other); }
+.stem-button[data-stem="other"]::before { background: var(--color-stem-other); }
+.stem-button[data-stem="backing"]:hover { border-color: var(--color-stem-other); }
+.stem-button[data-stem="backing"]::before { background: var(--color-stem-other); }
 
 .stem-buttons-small {
   display: flex;

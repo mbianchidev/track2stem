@@ -39,8 +39,14 @@ const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
         const canvasHeight = canvas.height;
         const centerY = canvasHeight / 2;
         
+        // Get theme colors from CSS variables
+        const computedStyle = getComputedStyle(document.documentElement);
+        const bgColor = computedStyle.getPropertyValue('--color-bg-primary').trim() || '#0a0b0f';
+        const accentPrimary = computedStyle.getPropertyValue('--color-accent-primary').trim() || '#00d4aa';
+        const accentSecondary = computedStyle.getPropertyValue('--color-accent-secondary').trim() || '#00f5c4';
+        
         // Clear canvas with dark background matching theme
-        ctx.fillStyle = '#0a0b0f';
+        ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, width, canvasHeight);
         
         // Draw center line
@@ -54,13 +60,11 @@ const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
         // Calculate samples per pixel
         const samplesPerPixel = Math.floor(channelData.length / width);
         
-        // Create gradient for waveform - matching cyan/teal accent theme
+        // Create gradient for waveform using theme colors
         const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-        gradient.addColorStop(0, '#00d4aa');
-        gradient.addColorStop(0.3, '#00e5b8');
-        gradient.addColorStop(0.5, '#00f5c4');
-        gradient.addColorStop(0.7, '#00e5b8');
-        gradient.addColorStop(1, '#00d4aa');
+        gradient.addColorStop(0, accentPrimary);
+        gradient.addColorStop(0.5, accentSecondary);
+        gradient.addColorStop(1, accentPrimary);
         
         ctx.fillStyle = gradient;
         

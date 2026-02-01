@@ -1,5 +1,4 @@
-/* Import Google Fonts - Manrope for refined modern typography */
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts are loaded via link tags in public/index.html for better performance */
 
 :root {
   /* Color System - Dark Mode Audio/Studio Theme */
@@ -137,4 +136,17 @@ code, pre {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
