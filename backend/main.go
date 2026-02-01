@@ -330,8 +330,46 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serve file
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s_%s.wav", jobID, stem))
-	w.Header().Set("Content-Type", "audio/wav")
-	http.ServeFile(w, r, filePath)
+	// Check file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "File not found on disk", http.StatusNotFound)
+		return
+	}
+
+	// Get the actual filename from the path
+	fileName := filepath.Base(filePath)
+	ext := filepath.Ext(filePath)
+
+	// Determine content type based on file extension
+	contentType := "audio/mpeg" // Default to MP3
+	if ext == ".wav" {
+		contentType = "audio/wav"
+	} else if ext == ".mp3" {
+		contentType = "audio/mpeg"
+	} else if ext == ".flac" {
+		contentType = "audio/flac"
+	}
+
+	// Open the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		http.Error(w, "Failed to open file", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Get file info for size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		http.Error(w, "Failed to get file info", http.StatusInternalServerError)
+		return
+	}
+
+	// Set headers before writing body
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+
+	// Stream the file
+	io.Copy(w, file)
 }
