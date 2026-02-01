@@ -5,6 +5,8 @@ import traceback
 import threading
 import time
 import re
+import pty
+import select
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import shutil
@@ -60,9 +62,17 @@ def cancel_job(job_id):
             proc_info = active_processes[job_id]
             process = proc_info.get('process')
             stop_event = proc_info.get('stop_event')
+            master_fd = proc_info.get('master_fd')
             
             if stop_event:
                 stop_event.set()
+            
+            # Close PTY master fd first
+            if master_fd:
+                try:
+                    os.close(master_fd)
+                except:
+                    pass
             
             if process and process.poll() is None:  # Still running
                 logger.info(f"Killing process for job {job_id}")
@@ -179,27 +189,34 @@ def process_audio():
         logger.info(f"Running command: {' '.join(cmd)}")
         processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': 'Starting AI separation...'}
         
-        # Run with real-time logging using Popen
+        # Use PTY to capture tqdm progress output (tqdm uses \r for updates)
+        # PTY makes demucs think it's writing to a terminal, so we get real-time updates
+        master_fd, slave_fd = pty.openpty()
+        
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified logging
-            text=True,
-            bufsize=1,  # Line buffered
-            env={**os.environ, 'CUDA_VISIBLE_DEVICES': '', 'PYTHONUNBUFFERED': '1'}
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+            env={**os.environ, 'CUDA_VISIBLE_DEVICES': '', 'PYTHONUNBUFFERED': '1', 'TERM': 'xterm'}
         )
         
+        # Close slave FD in parent process
+        os.close(slave_fd)
+        
         # Store process reference for cancellation
-        stop_estimation = threading.Event()
+        stop_threads = threading.Event()
         with process_lock:
             active_processes[job_id] = {
                 'process': process,
-                'stop_event': stop_estimation
+                'stop_event': stop_threads,
+                'master_fd': master_fd
             }
         
-        # Read output in real-time and update progress
+        # Tracking variables
         output_lines = []
         last_progress = 10
+        progress_lock = threading.Lock()
         
         def format_elapsed(seconds):
             """Format elapsed time as Xm Ys"""
@@ -207,129 +224,174 @@ def process_audio():
             secs = int(seconds % 60)
             return f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
         
-        # Regex patterns to match tqdm progress output
-        # Pattern 1: "  0%|          | 0/100 [00:00<?, ?it/s]"
-        # Pattern 2: " 50%|█████     | 50/100 [00:30<00:30, 1.67it/s]"
-        # Pattern 3: "100%|██████████| 100/100 [01:00<00:00, 1.67it/s]"
+        def update_progress(new_progress, stage_msg):
+            """Thread-safe progress update"""
+            nonlocal last_progress
+            with progress_lock:
+                if new_progress > last_progress:
+                    last_progress = new_progress
+                    elapsed = time.time() - start_time
+                    processing_status[job_id] = {
+                        'status': 'processing',
+                        'progress': new_progress,
+                        'stage': stage_msg,
+                        'elapsed': format_elapsed(elapsed)
+                    }
+                    logger.info(f"Progress: {new_progress}% - {stage_msg}")
+        
+        # Regex patterns for tqdm output
         progress_pattern = re.compile(r'(\d+)%\|')
-        # Also match fraction format: "50/100" or progress like "Separating track 1/6"
         fraction_pattern = re.compile(r'(\d+)/(\d+)')
         
         def read_output():
-            nonlocal last_progress
-            for line in iter(process.stdout.readline, ''):
-                line = line.strip()
-                if line:
-                    output_lines.append(line)
-                    logger.info(f"[Demucs] {line}")
+            """Read PTY output and parse progress"""
+            buffer = ""
+            
+            while not stop_threads.is_set():
+                try:
+                    # Use select to check if data is available (with timeout)
+                    ready, _, _ = select.select([master_fd], [], [], 0.5)
                     
-                    # Try to parse progress from tqdm output
-                    progress_match = progress_pattern.search(line)
-                    if progress_match:
-                        try:
-                            pct = int(progress_match.group(1))
-                            # Demucs separation is 10-90% of total progress (80% of the bar)
-                            # Map demucs 0-100% to our 10-90%
-                            mapped_progress = 10 + int(pct * 0.80)
-                            if mapped_progress > last_progress:
-                                last_progress = mapped_progress
-                                elapsed = time.time() - start_time
-                                processing_status[job_id] = {
-                                    'status': 'processing', 
-                                    'progress': mapped_progress, 
-                                    'stage': f'Separating audio stems... {pct}%',
-                                    'elapsed': format_elapsed(elapsed)
-                                }
-                                logger.info(f"Progress update: {pct}% -> mapped to {mapped_progress}%")
-                        except (ValueError, IndexError) as e:
-                            logger.warning(f"Failed to parse progress: {e}")
-                    else:
-                        # Try fraction pattern for stem processing
-                        frac_match = fraction_pattern.search(line)
-                        if frac_match and ('Separating' in line or 'track' in line.lower()):
+                    if not ready:
+                        # Check if process has ended
+                        if process.poll() is not None:
+                            break
+                        continue
+                    
+                    # Read available data
+                    try:
+                        chunk = os.read(master_fd, 4096).decode('utf-8', errors='replace')
+                    except OSError:
+                        break
+                    
+                    if not chunk:
+                        break
+                    
+                    buffer += chunk
+                    
+                    # Process buffer - split by \r or \n to handle tqdm updates
+                    while '\r' in buffer or '\n' in buffer:
+                        # Find first delimiter
+                        r_idx = buffer.find('\r')
+                        n_idx = buffer.find('\n')
+                        
+                        if r_idx != -1 and (n_idx == -1 or r_idx < n_idx):
+                            line, buffer = buffer[:r_idx], buffer[r_idx+1:]
+                        else:
+                            line, buffer = buffer[:n_idx], buffer[n_idx+1:]
+                        
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Remove ANSI escape codes for cleaner logging
+                        clean_line = re.sub(r'\x1b\[[0-9;]*[mK]', '', line)
+                        if clean_line:
+                            output_lines.append(clean_line)
+                            logger.info(f"[Demucs] {clean_line}")
+                        
+                        # Parse progress from tqdm output
+                        progress_match = progress_pattern.search(line)
+                        if progress_match:
                             try:
-                                current = int(frac_match.group(1))
-                                total = int(frac_match.group(2))
-                                if total > 0:
-                                    pct = int((current / total) * 100)
-                                    mapped_progress = 10 + int(pct * 0.80)
-                                    if mapped_progress > last_progress:
-                                        last_progress = mapped_progress
-                                        elapsed = time.time() - start_time
-                                        processing_status[job_id] = {
-                                            'status': 'processing',
-                                            'progress': mapped_progress,
-                                            'stage': f'Processing stem {current}/{total}...',
-                                            'elapsed': format_elapsed(elapsed)
-                                        }
-                            except (ValueError, ZeroDivisionError):
+                                pct = int(progress_match.group(1))
+                                # Map demucs 0-100% to our 10-90%
+                                mapped = 10 + int(pct * 0.80)
+                                update_progress(mapped, f'Separating stems... {pct}%')
+                            except (ValueError, IndexError):
                                 pass
-                        # Check for loading/model messages
-                        elif 'loading' in line.lower() or 'model' in line.lower():
-                            elapsed = time.time() - start_time
-                            processing_status[job_id] = {
-                                'status': 'processing',
-                                'progress': max(last_progress, 12),
-                                'stage': 'Loading AI model...',
-                                'elapsed': format_elapsed(elapsed)
-                            }
-        
-        # Read output in a thread to avoid blocking
-        output_thread = threading.Thread(target=read_output)
-        output_thread.start()
-        
-        # Also run a time-based progress estimator as fallback
-        # Typical processing takes 3-10 minutes, so we estimate based on time
-        # stop_estimation event is already created above when storing in active_processes
+                        else:
+                            # Check for model loading messages
+                            lower_line = line.lower()
+                            if 'loading' in lower_line or 'downloading' in lower_line:
+                                update_progress(12, 'Loading AI model...')
+                            elif 'separating' in lower_line:
+                                frac_match = fraction_pattern.search(line)
+                                if frac_match:
+                                    try:
+                                        curr, total = int(frac_match.group(1)), int(frac_match.group(2))
+                                        if total > 0:
+                                            pct = int((curr / total) * 100)
+                                            mapped = 10 + int(pct * 0.80)
+                                            update_progress(mapped, f'Processing track {curr}/{total}...')
+                                    except:
+                                        pass
+                                        
+                except Exception as e:
+                    logger.warning(f"Error reading output: {e}")
+                    break
+            
+            # Process any remaining buffer
+            if buffer.strip():
+                clean = re.sub(r'\x1b\[[0-9;]*[mK]', '', buffer.strip())
+                if clean:
+                    output_lines.append(clean)
+                    logger.info(f"[Demucs] {clean}")
         
         def estimate_progress():
-            """Fallback progress estimation based on elapsed time"""
-            # Assume typical processing takes about 5 minutes (300 seconds)
-            # We use this to provide smooth progress updates when demucs doesn't output
-            estimated_duration = 300  # 5 minutes baseline
+            """Time-based progress estimation - updates immediately, then every 2 seconds"""
+            # Typical processing: 3-10 minutes depending on file size
+            estimated_duration = 300  # 5 minute baseline
             
-            while not stop_estimation.is_set():
-                time.sleep(5)  # Update every 5 seconds
-                if stop_estimation.is_set():
-                    break
-                    
+            # Update immediately on first run, then every 2 seconds
+            while not stop_threads.is_set():
                 elapsed = time.time() - start_time
-                # Only update if we haven't gotten real progress updates
-                current_status = processing_status.get(job_id, {})
-                current_progress = current_status.get('progress', 10)
                 
-                # Time-based estimate: start at 10%, go up to 85% over estimated_duration
-                time_based_progress = 10 + min(75, int((elapsed / estimated_duration) * 75))
+                # Calculate time-based progress (10% to 85%)
+                time_progress = 10 + min(75, int((elapsed / estimated_duration) * 75))
                 
-                # Only use time-based if it's higher than current and we're still processing
-                if (time_based_progress > current_progress and 
-                    current_status.get('status') == 'processing' and
-                    current_progress < 85):
-                    processing_status[job_id] = {
-                        'status': 'processing',
-                        'progress': time_based_progress,
-                        'stage': current_status.get('stage', 'Processing audio...'),
-                        'elapsed': format_elapsed(elapsed)
-                    }
+                with progress_lock:
+                    current = last_progress
+                    status = processing_status.get(job_id, {})
+                    
+                    # Only update if time-based is higher and we're still processing
+                    if (time_progress > current and 
+                        status.get('status') == 'processing' and
+                        current < 85):
+                        processing_status[job_id] = {
+                            'status': 'processing',
+                            'progress': time_progress,
+                            'stage': f'Processing audio... ({format_elapsed(elapsed)})',
+                            'elapsed': format_elapsed(elapsed)
+                        }
+                
+                # Sleep after update (so first update is immediate)
+                for _ in range(4):  # 4 x 0.5s = 2s, but check stop_threads frequently
+                    if stop_threads.is_set():
+                        break
+                    time.sleep(0.5)
         
-        estimation_thread = threading.Thread(target=estimate_progress)
+        # Start both threads
+        output_thread = threading.Thread(target=read_output, daemon=True)
+        estimation_thread = threading.Thread(target=estimate_progress, daemon=True)
+        output_thread.start()
         estimation_thread.start()
         
-        # Wait for process to complete (with timeout)
+        logger.info(f"Started output reader and progress estimator for job {job_id}")
+        
+        # Wait for process to complete
         try:
             return_code = process.wait(timeout=1800)  # 30 min timeout
         except subprocess.TimeoutExpired:
             process.kill()
-            stop_estimation.set()
+            stop_threads.set()
+            try:
+                os.close(master_fd)
+            except:
+                pass
             output_thread.join(timeout=5)
             estimation_thread.join(timeout=2)
-            # Clean up from active_processes
             with process_lock:
                 if job_id in active_processes:
                     del active_processes[job_id]
             raise subprocess.TimeoutExpired(cmd, 1800)
         
-        stop_estimation.set()
+        # Signal threads to stop and clean up
+        stop_threads.set()
+        try:
+            os.close(master_fd)
+        except:
+            pass
         output_thread.join(timeout=10)
         estimation_thread.join(timeout=2)
         
