@@ -5,7 +5,9 @@ import './App.css';
 function App() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [currentJob, setCurrentJob] = useState(null);
+  const [processingProgress, setProcessingProgress] = useState({ progress: 0, stage: '' });
   const [jobs, setJobs] = useState([]);
   const [error, setError] = useState('');
 
@@ -19,8 +21,11 @@ function App() {
     if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
       const interval = setInterval(() => {
         fetchJobStatus(currentJob.id);
-      }, 3000);
+        fetchProcessingProgress(currentJob.id);
+      }, 2000);
       return () => clearInterval(interval);
+    } else {
+      setProcessingProgress({ progress: 0, stage: '' });
     }
   }, [currentJob]);
 
@@ -39,9 +44,21 @@ function App() {
       setCurrentJob(response.data);
       if (response.data.status === 'completed' || response.data.status === 'failed') {
         fetchJobs();
+        setProcessingProgress({ progress: 100, stage: 'Done!' });
       }
     } catch (err) {
       console.error('Failed to fetch job status:', err);
+    }
+  };
+
+  const fetchProcessingProgress = async (jobId) => {
+    try {
+      const response = await axios.get(`${API_BASE}/processing-status/${jobId}`);
+      if (response.data) {
+        setProcessingProgress(response.data);
+      }
+    } catch (err) {
+      // Silently ignore - progress endpoint may not be available
     }
   };
 
@@ -72,12 +89,17 @@ function App() {
     formData.append('file', file);
 
     setUploading(true);
+    setUploadProgress(0);
     setError('');
 
     try {
       const response = await axios.post(`${API_BASE}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
         },
       });
       
@@ -125,8 +147,13 @@ function App() {
               disabled={!file || uploading}
               className="upload-button"
             >
-              {uploading ? 'Uploading...' : 'Upload & Process'}
+              {uploading ? `Uploading... ${uploadProgress}%` : 'Upload & Process'}
             </button>
+            {uploading && (
+              <div className="progress-container">
+                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
           </div>
           {error && <p className="error">{error}</p>}
         </div>
@@ -144,10 +171,18 @@ function App() {
               <p className="job-id">Job ID: {currentJob.id}</p>
               <p className="job-date">Created: {formatDate(currentJob.created_at)}</p>
               
-              {currentJob.status === 'processing' && (
+              {(currentJob.status === 'processing' || currentJob.status === 'pending') && (
                 <div className="processing-indicator">
-                  <div className="spinner"></div>
-                  <p>Processing audio... This may take several minutes.</p>
+                  <div className="progress-container large">
+                    <div 
+                      className="progress-bar processing" 
+                      style={{ width: `${processingProgress.progress || 10}%` }}
+                    ></div>
+                  </div>
+                  <p className="progress-text">
+                    {processingProgress.stage || 'Starting processing...'} ({processingProgress.progress || 0}%)
+                  </p>
+                  <p className="processing-note">🎧 AI is separating your audio stems. This may take 5-15 minutes depending on file size.</p>
                 </div>
               )}
 

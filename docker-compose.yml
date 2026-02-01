@@ -33,6 +33,7 @@ services:
       - outputs:/app/outputs
     environment:
       - PORT=5000
+      - FLASK_DEBUG=true
     networks:
       - track2stem-network
 

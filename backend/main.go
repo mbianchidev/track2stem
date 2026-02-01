@@ -19,12 +19,12 @@ import (
 )
 
 type Job struct {
-	ID         string    `json:"id"`
-	Status     string    `json:"status"` // pending, processing, completed, failed
-	FileName   string    `json:"filename"`
-	CreatedAt  time.Time `json:"created_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	Error      string    `json:"error,omitempty"`
+	ID          string            `json:"id"`
+	Status      string            `json:"status"` // pending, processing, completed, failed
+	FileName    string            `json:"filename"`
+	CreatedAt   time.Time         `json:"created_at"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
+	Error       string            `json:"error,omitempty"`
 	OutputFiles map[string]string `json:"output_files,omitempty"`
 }
 
@@ -67,6 +67,7 @@ func main() {
 	router.HandleFunc("/api/jobs/{id}", getJobHandler).Methods("GET")
 	router.HandleFunc("/api/jobs", listJobsHandler).Methods("GET")
 	router.HandleFunc("/api/download/{id}/{stem}", downloadHandler).Methods("GET")
+	router.HandleFunc("/api/processing-status/{id}", processingStatusHandler).Methods("GET")
 
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
@@ -169,19 +170,19 @@ func processJob(jobID, filePath string) {
 	// Create multipart form
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	
+
 	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
 	if err != nil {
 		updateJobError(jobID, "Failed to create form")
 		return
 	}
-	
+
 	_, err = io.Copy(part, file)
 	if err != nil {
 		updateJobError(jobID, "Failed to copy file")
 		return
 	}
-	
+
 	// Add job_id field
 	writer.WriteField("job_id", jobID)
 	writer.Close()
@@ -220,7 +221,7 @@ func processJob(jobID, filePath string) {
 	job.Status = "completed"
 	now := time.Now()
 	job.CompletedAt = &now
-	
+
 	// Extract output files
 	if outputs, ok := result["outputs"].(map[string]interface{}); ok {
 		job.OutputFiles = make(map[string]string)
@@ -236,7 +237,7 @@ func processJob(jobID, filePath string) {
 func updateJobError(jobID, errMsg string) {
 	jobsMutex.Lock()
 	defer jobsMutex.Unlock()
-	
+
 	if job, exists := jobs[jobID]; exists {
 		job.Status = "failed"
 		job.Error = errMsg
@@ -272,6 +273,36 @@ func listJobsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(jobList)
+}
+
+func processingStatusHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	// Get processing status from processor service
+	processorURL := os.Getenv("PROCESSOR_URL")
+	if processorURL == "" {
+		processorURL = "http://processor:5000"
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(processorURL + "/status/" + jobID)
+	if err != nil {
+		// Return default status if processor is not reachable
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   "unknown",
+			"progress": 0,
+			"stage":    "Checking status...",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	// Forward the response
+	w.Header().Set("Content-Type", "application/json")
+	body, _ := io.ReadAll(resp.Body)
+	w.Write(body)
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
