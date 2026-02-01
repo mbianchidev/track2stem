@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -12,12 +12,57 @@ function App() {
   const [error, setError] = useState('');
   const [stemMode, setStemMode] = useState('all'); // 'all' or 'isolate'
   const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
+  const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
+  const startTimeRef = useRef(null);
+  const timerRef = useRef(null);
 
   const API_BASE = process.env.REACT_APP_API_URL || '/api';
+
+  // Format elapsed time as Xm Ys
+  const formatElapsedTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
 
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  // Stopwatch effect - runs every second when processing
+  useEffect(() => {
+    if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
+      // Start the timer if not already started
+      if (!startTimeRef.current) {
+        startTimeRef.current = Date.now();
+      }
+      
+      // Update elapsed time every second
+      timerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setElapsedTime(elapsed);
+      }, 1000);
+      
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+      };
+    } else {
+      // Job finished or no job - reset timer refs but keep last elapsed time
+      if (currentJob?.status === 'completed' || currentJob?.status === 'failed') {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      }
+      // Reset for new job
+      if (!currentJob) {
+        startTimeRef.current = null;
+        setElapsedTime(0);
+      }
+    }
+  }, [currentJob]);
 
   useEffect(() => {
     if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
@@ -95,6 +140,10 @@ function App() {
     setUploading(true);
     setUploadProgress(0);
     setError('');
+    
+    // Reset timer for new job
+    startTimeRef.current = Date.now();
+    setElapsedTime(0);
 
     try {
       const response = await axios.post(`${API_BASE}/upload`, formData, {
@@ -235,18 +284,14 @@ function App() {
                   <p className="progress-text">
                     {processingProgress.stage || 'Starting processing...'} ({processingProgress.progress || 0}%)
                   </p>
-                  {processingProgress.elapsed && (
-                    <p className="elapsed-time">⏱️ Elapsed: {processingProgress.elapsed}</p>
-                  )}
+                  <p className="elapsed-time">⏱️ Elapsed: {formatElapsedTime(elapsedTime)}</p>
                   <p className="processing-note">🎧 AI is separating your audio stems. This may take 5-15 minutes depending on file size.</p>
                 </div>
               )}
 
               {currentJob.status === 'completed' && currentJob.output_files && (
                 <div className="stems">
-                  {currentJob.processing_time && (
-                    <p className="total-time">✅ Processed in {currentJob.processing_time}</p>
-                  )}
+                  <p className="total-time">✅ Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</p>
                   <h3>Download Stems:</h3>
                   <div className="stem-buttons">
                     {Object.keys(currentJob.output_files).map((stem) => (
