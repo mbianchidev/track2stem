@@ -7,40 +7,40 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 build: ## Build all Docker images
-	docker-compose build
+	docker compose build
 
 up: ## Start all services
-	docker-compose up -d
+	docker compose up -d
 
 down: ## Stop all services
-	docker-compose down
+	docker compose down
 
 logs: ## Show logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 clean: ## Remove all containers, volumes, and images
-	docker-compose down -v
-	docker-compose rm -f
+	docker compose down -v
+	docker compose rm -f
 
 restart: down up ## Restart all services
 
 status: ## Show status of all services
-	docker-compose ps
+	docker compose ps
 
 backend-logs: ## Show backend logs
-	docker-compose logs -f backend
+	docker compose logs -f backend
 
 frontend-logs: ## Show frontend logs
-	docker-compose logs -f frontend
+	docker compose logs -f frontend
 
 processor-logs: ## Show processor logs
-	docker-compose logs -f processor
+	docker compose logs -f processor
 
 shell-backend: ## Open shell in backend container
-	docker-compose exec backend sh
+	docker compose exec backend sh
 
 shell-processor: ## Open shell in processor container
-	docker-compose exec processor bash
+	docker compose exec processor bash
 
 dev: ## Start services in development mode (with logs)
-	docker-compose up --build
+	docker compose up --build
