@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
+import Spectrogram from './Spectrogram';
+
+// LocalStorage keys
+const STORAGE_KEYS = {
+  JOBS: 'track2stem_jobs',
+  CURRENT_JOB: 'track2stem_current_job',
+  START_TIME: 'track2stem_start_time',
+  PROCESSING_PROGRESS: 'track2stem_progress',
+  INPUT_FILE_NAME: 'track2stem_input_filename',
+};
 
 function App() {
   const [file, setFile] = useState(null);
@@ -13,6 +23,8 @@ function App() {
   const [stemMode, setStemMode] = useState('all'); // 'all' or 'isolate'
   const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
   const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
+  const [inputFileName, setInputFileName] = useState(''); // Keep track of input file name for display
+  const [isInitialized, setIsInitialized] = useState(false); // Track if localStorage has been loaded
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -25,6 +37,70 @@ function App() {
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
+  // Load persisted state from localStorage
+  useEffect(() => {
+    // Load jobs from localStorage
+    const savedJobs = localStorage.getItem(STORAGE_KEYS.JOBS);
+    if (savedJobs) {
+      try {
+        setJobs(JSON.parse(savedJobs));
+      } catch (e) {
+        console.error('Failed to parse saved jobs:', e);
+      }
+    }
+    
+    // Load current job from localStorage
+    const savedCurrentJob = localStorage.getItem(STORAGE_KEYS.CURRENT_JOB);
+    if (savedCurrentJob) {
+      try {
+        const parsedJob = JSON.parse(savedCurrentJob);
+        setCurrentJob(parsedJob);
+      } catch (e) {
+        console.error('Failed to parse saved current job:', e);
+      }
+    }
+    
+    // Load start time for timer recovery
+    const savedStartTime = localStorage.getItem(STORAGE_KEYS.START_TIME);
+    if (savedStartTime) {
+      startTimeRef.current = parseInt(savedStartTime, 10);
+    }
+    
+    // Load processing progress
+    const savedProgress = localStorage.getItem(STORAGE_KEYS.PROCESSING_PROGRESS);
+    if (savedProgress) {
+      try {
+        setProcessingProgress(JSON.parse(savedProgress));
+      } catch (e) {
+        console.error('Failed to parse saved progress:', e);
+      }
+    }
+    
+    // Load input file name
+    const savedInputFileName = localStorage.getItem(STORAGE_KEYS.INPUT_FILE_NAME);
+    if (savedInputFileName) {
+      setInputFileName(savedInputFileName);
+    }
+    
+    // Mark as initialized after loading
+    setIsInitialized(true);
+  }, []);
+
+  // Save jobs to localStorage whenever they change
+  useEffect(() => {
+    if (jobs.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobs));
+    }
+  }, [jobs]);
+
+  // Save current job to localStorage whenever it changes
+  useEffect(() => {
+    if (currentJob) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_JOB, JSON.stringify(currentJob));
+    }
+  }, [currentJob]);
+
+  // Fetch jobs on mount and merge with localStorage
   useEffect(() => {
     fetchJobs();
   }, []);
@@ -35,7 +111,12 @@ function App() {
       // Start the timer if not already started
       if (!startTimeRef.current) {
         startTimeRef.current = Date.now();
+        localStorage.setItem(STORAGE_KEYS.START_TIME, startTimeRef.current.toString());
       }
+      
+      // Calculate initial elapsed time (for page refresh recovery)
+      const initialElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setElapsedTime(initialElapsed);
       
       // Update elapsed time every second
       timerRef.current = setInterval(() => {
@@ -55,12 +136,10 @@ function App() {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
+        localStorage.removeItem(STORAGE_KEYS.START_TIME);
       }
-      // Reset for new job
-      if (!currentJob) {
-        startTimeRef.current = null;
-        setElapsedTime(0);
-      }
+      // Only reset if initialized and explicitly no job (user cleared it)
+      // Don't reset on initial load before localStorage is read
     }
   }, [currentJob]);
 
@@ -71,15 +150,38 @@ function App() {
         fetchProcessingProgress(currentJob.id);
       }, 2000);
       return () => clearInterval(interval);
-    } else {
-      setProcessingProgress({ progress: 0, stage: '' });
     }
+    // Don't reset progress here - it causes the 90% issue
   }, [currentJob]);
 
   const fetchJobs = async () => {
     try {
       const response = await axios.get(`${API_BASE}/jobs`);
-      setJobs(response.data || []);
+      const serverJobs = response.data || [];
+      
+      // Merge server jobs with localStorage jobs (localStorage takes precedence for completed jobs)
+      const savedJobsStr = localStorage.getItem(STORAGE_KEYS.JOBS);
+      const savedJobs = savedJobsStr ? JSON.parse(savedJobsStr) : [];
+      
+      // Create a map of all jobs
+      const jobsMap = new Map();
+      
+      // Add saved jobs first
+      savedJobs.forEach(job => {
+        jobsMap.set(job.id, job);
+      });
+      
+      // Update with server jobs (server has latest status)
+      serverJobs.forEach(job => {
+        const existing = jobsMap.get(job.id);
+        if (!existing || job.status === 'completed' || job.status === 'failed') {
+          jobsMap.set(job.id, job);
+        }
+      });
+      
+      const mergedJobs = Array.from(jobsMap.values());
+      setJobs(mergedJobs);
+      
     } catch (err) {
       console.error('Failed to fetch jobs:', err);
     }
@@ -88,9 +190,16 @@ function App() {
   const fetchJobStatus = async (jobId) => {
     try {
       const response = await axios.get(`${API_BASE}/jobs/${jobId}`);
-      setCurrentJob(response.data);
-      if (response.data.status === 'completed' || response.data.status === 'failed') {
-        fetchJobs();
+      const updatedJob = response.data;
+      setCurrentJob(updatedJob);
+      
+      if (updatedJob.status === 'completed' || updatedJob.status === 'failed') {
+        // Update the job in our jobs list with processing time
+        setJobs(prevJobs => {
+          const updatedJobs = prevJobs.filter(j => j.id !== updatedJob.id);
+          updatedJobs.push(updatedJob);
+          return updatedJobs;
+        });
         setProcessingProgress({ progress: 100, stage: 'Done!' });
       }
     } catch (err) {
@@ -103,6 +212,8 @@ function App() {
       const response = await axios.get(`${API_BASE}/processing-status/${jobId}`);
       if (response.data) {
         setProcessingProgress(response.data);
+        // Persist progress to localStorage
+        localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify(response.data));
       }
     } catch (err) {
       // Silently ignore - progress endpoint may not be available
@@ -141,9 +252,18 @@ function App() {
     setUploadProgress(0);
     setError('');
     
+    // Save input file name for display during processing
+    setInputFileName(file.name);
+    localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, file.name);
+    
     // Reset timer for new job
     startTimeRef.current = Date.now();
+    localStorage.setItem(STORAGE_KEYS.START_TIME, startTimeRef.current.toString());
     setElapsedTime(0);
+    
+    // Reset progress for new job
+    setProcessingProgress({ progress: 0, stage: 'Starting...' });
+    localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify({ progress: 0, stage: 'Starting...' }));
 
     try {
       const response = await axios.post(`${API_BASE}/upload`, formData, {
@@ -172,8 +292,62 @@ function App() {
     window.open(`${API_BASE}/download/${jobId}/${stem}`, '_blank');
   };
 
+  const handleDeleteJob = async (jobId) => {
+    // Find the job to check if it's in progress
+    const jobToDelete = jobs.find(j => j.id === jobId) || (currentJob?.id === jobId ? currentJob : null);
+    
+    // If job is in progress, try to cancel it on the server
+    if (jobToDelete && (jobToDelete.status === 'pending' || jobToDelete.status === 'processing')) {
+      try {
+        await axios.delete(`${API_BASE}/jobs/${jobId}`);
+      } catch (err) {
+        console.warn('Could not cancel job on server:', err);
+      }
+    }
+    
+    // Remove from state
+    setJobs(prevJobs => prevJobs.filter(j => j.id !== jobId));
+    
+    // Update localStorage
+    const savedJobs = localStorage.getItem(STORAGE_KEYS.JOBS);
+    if (savedJobs) {
+      const parsed = JSON.parse(savedJobs);
+      const filtered = parsed.filter(j => j.id !== jobId);
+      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(filtered));
+    }
+    
+    // If it's the current job, clear it and all related state
+    if (currentJob && currentJob.id === jobId) {
+      setCurrentJob(null);
+      setProcessingProgress({ progress: 0, stage: '' });
+      setInputFileName('');
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
+      localStorage.removeItem(STORAGE_KEYS.PROCESSING_PROGRESS);
+      localStorage.removeItem(STORAGE_KEYS.INPUT_FILE_NAME);
+      localStorage.removeItem(STORAGE_KEYS.START_TIME);
+      startTimeRef.current = null;
+      setElapsedTime(0);
+    }
+  };
+
+  const handleClearCurrentJob = () => {
+    setCurrentJob(null);
+    setProcessingProgress({ progress: 0, stage: '' });
+    setInputFileName('');
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
+    localStorage.removeItem(STORAGE_KEYS.START_TIME);
+    localStorage.removeItem(STORAGE_KEYS.PROCESSING_PROGRESS);
+    localStorage.removeItem(STORAGE_KEYS.INPUT_FILE_NAME);
+    startTimeRef.current = null;
+    setElapsedTime(0);
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const getDownloadUrl = (jobId, stem) => {
+    return `${API_BASE}/download/${jobId}/${stem}`;
   };
 
   return (
@@ -195,6 +369,13 @@ function App() {
               disabled={uploading}
             />
             {file && <p className="file-name">Selected: {file.name}</p>}
+            
+            {/* Waveform for input file - show when file is selected */}
+            {file && (
+              <div className="input-spectrogram">
+                <Spectrogram audioFile={file} title="📊 Input Audio Waveform" height={80} />
+              </div>
+            )}
             
             {/* Stem Mode Options */}
             <div className="stem-options">
@@ -262,7 +443,14 @@ function App() {
 
         {currentJob && (
           <div className="current-job">
-            <h2>Current Job</h2>
+            <div className="section-header">
+              <h2>Current Job</h2>
+              {(currentJob.status === 'completed' || currentJob.status === 'failed') && (
+                <button className="clear-button" onClick={handleClearCurrentJob}>
+                  ✕ Clear
+                </button>
+              )}
+            </div>
             <div className="job-card">
               <div className="job-header">
                 <span className="job-filename">{currentJob.filename}</span>
@@ -305,6 +493,21 @@ function App() {
                       </button>
                     ))}
                   </div>
+                  
+                  {/* Spectrograms for output stems */}
+                  <div className="output-spectrograms">
+                    <h3>📊 Output Spectrograms:</h3>
+                    <div className="spectrograms-grid">
+                      {Object.keys(currentJob.output_files).map((stem) => (
+                        <Spectrogram 
+                          key={stem}
+                          audioUrl={getDownloadUrl(currentJob.id, stem)}
+                          title={stem.charAt(0).toUpperCase() + stem.slice(1)}
+                          height={60}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -323,9 +526,21 @@ function App() {
                 <div key={job.id} className="job-card-small">
                   <div className="job-header">
                     <span className="job-filename">{job.filename}</span>
-                    <span className={`job-status status-${job.status}`}>
-                      {job.status}
-                    </span>
+                    <div className="job-header-right">
+                      {job.processing_time && (
+                        <span className="job-time">⏱️ {job.processing_time}</span>
+                      )}
+                      <span className={`job-status status-${job.status}`}>
+                        {job.status}
+                      </span>
+                      <button 
+                        className="delete-job-button" 
+                        onClick={() => handleDeleteJob(job.id)}
+                        title="Delete job"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                   {job.status === 'completed' && job.output_files && (
                     <div className="stem-buttons-small">

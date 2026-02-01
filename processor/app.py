@@ -4,6 +4,7 @@ import logging
 import traceback
 import threading
 import time
+import re
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import shutil
@@ -28,6 +29,10 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 # Track processing progress
 processing_status = {}
 
+# Track active subprocesses for cancellation
+active_processes = {}
+process_lock = threading.Lock()
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -44,6 +49,51 @@ def get_status(job_id):
     if job_id in processing_status:
         return jsonify(processing_status[job_id])
     return jsonify({'status': 'unknown', 'progress': 0})
+
+@app.route('/cancel/<job_id>', methods=['POST'])
+def cancel_job(job_id):
+    """Cancel a running job by killing its subprocess"""
+    logger.info(f"Cancel request received for job: {job_id}")
+    
+    with process_lock:
+        if job_id in active_processes:
+            proc_info = active_processes[job_id]
+            process = proc_info.get('process')
+            stop_event = proc_info.get('stop_event')
+            
+            if stop_event:
+                stop_event.set()
+            
+            if process and process.poll() is None:  # Still running
+                logger.info(f"Killing process for job {job_id}")
+                try:
+                    process.terminate()
+                    # Give it a moment to terminate gracefully
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()  # Force kill if it doesn't stop
+                    logger.info(f"Process for job {job_id} terminated")
+                except Exception as e:
+                    logger.error(f"Error killing process: {e}")
+            
+            # Clean up
+            del active_processes[job_id]
+            processing_status[job_id] = {'status': 'cancelled', 'progress': 0, 'stage': 'Cancelled by user'}
+            
+            # Clean up any partial files
+            job_output_dir = os.path.join(OUTPUT_FOLDER, job_id)
+            if os.path.exists(job_output_dir):
+                try:
+                    shutil.rmtree(job_output_dir)
+                    logger.info(f"Cleaned up output directory for cancelled job {job_id}")
+                except Exception as e:
+                    logger.error(f"Error cleaning up output dir: {e}")
+            
+            return jsonify({'status': 'cancelled', 'job_id': job_id})
+        else:
+            logger.info(f"No active process found for job {job_id}")
+            return jsonify({'status': 'not_found', 'job_id': job_id}), 404
 
 @app.route('/process', methods=['POST'])
 def process_audio():
@@ -139,6 +189,14 @@ def process_audio():
             env={**os.environ, 'CUDA_VISIBLE_DEVICES': '', 'PYTHONUNBUFFERED': '1'}
         )
         
+        # Store process reference for cancellation
+        stop_estimation = threading.Event()
+        with process_lock:
+            active_processes[job_id] = {
+                'process': process,
+                'stop_event': stop_estimation
+            }
+        
         # Read output in real-time and update progress
         output_lines = []
         last_progress = 10
@@ -149,6 +207,14 @@ def process_audio():
             secs = int(seconds % 60)
             return f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
         
+        # Regex patterns to match tqdm progress output
+        # Pattern 1: "  0%|          | 0/100 [00:00<?, ?it/s]"
+        # Pattern 2: " 50%|█████     | 50/100 [00:30<00:30, 1.67it/s]"
+        # Pattern 3: "100%|██████████| 100/100 [01:00<00:00, 1.67it/s]"
+        progress_pattern = re.compile(r'(\d+)%\|')
+        # Also match fraction format: "50/100" or progress like "Separating track 1/6"
+        fraction_pattern = re.compile(r'(\d+)/(\d+)')
+        
         def read_output():
             nonlocal last_progress
             for line in iter(process.stdout.readline, ''):
@@ -157,42 +223,115 @@ def process_audio():
                     output_lines.append(line)
                     logger.info(f"[Demucs] {line}")
                     
-                    # Parse progress from demucs output (looks for percentage)
-                    if '%|' in line:
+                    # Try to parse progress from tqdm output
+                    progress_match = progress_pattern.search(line)
+                    if progress_match:
                         try:
-                            # Extract percentage from progress bar like "50%|████"
-                            pct_str = line.split('%|')[0].strip().split()[-1]
-                            pct = int(float(pct_str))
+                            pct = int(progress_match.group(1))
                             # Demucs separation is 10-90% of total progress (80% of the bar)
-                            # When demucs is at 50%, we should be at 50% total
                             # Map demucs 0-100% to our 10-90%
                             mapped_progress = 10 + int(pct * 0.80)
                             if mapped_progress > last_progress:
                                 last_progress = mapped_progress
                                 elapsed = time.time() - start_time
-                                # Show progress with elapsed time
                                 processing_status[job_id] = {
                                     'status': 'processing', 
                                     'progress': mapped_progress, 
-                                    'stage': 'Separating audio stems...',
+                                    'stage': f'Separating audio stems... {pct}%',
                                     'elapsed': format_elapsed(elapsed)
                                 }
-                        except (ValueError, IndexError):
-                            pass
+                                logger.info(f"Progress update: {pct}% -> mapped to {mapped_progress}%")
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Failed to parse progress: {e}")
+                    else:
+                        # Try fraction pattern for stem processing
+                        frac_match = fraction_pattern.search(line)
+                        if frac_match and ('Separating' in line or 'track' in line.lower()):
+                            try:
+                                current = int(frac_match.group(1))
+                                total = int(frac_match.group(2))
+                                if total > 0:
+                                    pct = int((current / total) * 100)
+                                    mapped_progress = 10 + int(pct * 0.80)
+                                    if mapped_progress > last_progress:
+                                        last_progress = mapped_progress
+                                        elapsed = time.time() - start_time
+                                        processing_status[job_id] = {
+                                            'status': 'processing',
+                                            'progress': mapped_progress,
+                                            'stage': f'Processing stem {current}/{total}...',
+                                            'elapsed': format_elapsed(elapsed)
+                                        }
+                            except (ValueError, ZeroDivisionError):
+                                pass
+                        # Check for loading/model messages
+                        elif 'loading' in line.lower() or 'model' in line.lower():
+                            elapsed = time.time() - start_time
+                            processing_status[job_id] = {
+                                'status': 'processing',
+                                'progress': max(last_progress, 12),
+                                'stage': 'Loading AI model...',
+                                'elapsed': format_elapsed(elapsed)
+                            }
         
         # Read output in a thread to avoid blocking
         output_thread = threading.Thread(target=read_output)
         output_thread.start()
+        
+        # Also run a time-based progress estimator as fallback
+        # Typical processing takes 3-10 minutes, so we estimate based on time
+        # stop_estimation event is already created above when storing in active_processes
+        
+        def estimate_progress():
+            """Fallback progress estimation based on elapsed time"""
+            # Assume typical processing takes about 5 minutes (300 seconds)
+            # We use this to provide smooth progress updates when demucs doesn't output
+            estimated_duration = 300  # 5 minutes baseline
+            
+            while not stop_estimation.is_set():
+                time.sleep(5)  # Update every 5 seconds
+                if stop_estimation.is_set():
+                    break
+                    
+                elapsed = time.time() - start_time
+                # Only update if we haven't gotten real progress updates
+                current_status = processing_status.get(job_id, {})
+                current_progress = current_status.get('progress', 10)
+                
+                # Time-based estimate: start at 10%, go up to 85% over estimated_duration
+                time_based_progress = 10 + min(75, int((elapsed / estimated_duration) * 75))
+                
+                # Only use time-based if it's higher than current and we're still processing
+                if (time_based_progress > current_progress and 
+                    current_status.get('status') == 'processing' and
+                    current_progress < 85):
+                    processing_status[job_id] = {
+                        'status': 'processing',
+                        'progress': time_based_progress,
+                        'stage': current_status.get('stage', 'Processing audio...'),
+                        'elapsed': format_elapsed(elapsed)
+                    }
+        
+        estimation_thread = threading.Thread(target=estimate_progress)
+        estimation_thread.start()
         
         # Wait for process to complete (with timeout)
         try:
             return_code = process.wait(timeout=1800)  # 30 min timeout
         except subprocess.TimeoutExpired:
             process.kill()
+            stop_estimation.set()
             output_thread.join(timeout=5)
+            estimation_thread.join(timeout=2)
+            # Clean up from active_processes
+            with process_lock:
+                if job_id in active_processes:
+                    del active_processes[job_id]
             raise subprocess.TimeoutExpired(cmd, 1800)
         
+        stop_estimation.set()
         output_thread.join(timeout=10)
+        estimation_thread.join(timeout=2)
         
         full_output = '\n'.join(output_lines)
         
@@ -200,13 +339,17 @@ def process_audio():
             logger.error(f"Demucs failed with return code {return_code}")
             logger.error(f"Output: {full_output}")
             processing_status[job_id] = {'status': 'failed', 'progress': 0, 'stage': 'Processing failed'}
+            # Clean up from active_processes
+            with process_lock:
+                if job_id in active_processes:
+                    del active_processes[job_id]
             return jsonify({
                 'error': 'Processing failed',
                 'details': full_output
             }), 500
         
         elapsed = time.time() - start_time
-        processing_status[job_id] = {'status': 'processing', 'progress': 80, 'stage': 'Organizing output files', 'elapsed': format_elapsed(elapsed)}
+        processing_status[job_id] = {'status': 'processing', 'progress': 90, 'stage': 'AI separation complete, organizing files...', 'elapsed': format_elapsed(elapsed)}
         logger.info("Demucs completed successfully, organizing output files...")
         
         # Demucs creates: OUTPUT_FOLDER/htdemucs_6s/filename_without_ext/stem.mp3 (or .wav)
@@ -332,6 +475,11 @@ def process_audio():
         
         processing_status[job_id] = {'status': 'completed', 'progress': 100, 'stage': 'Complete!', 'elapsed': time_str, 'total_time': time_str}
         logger.info(f"=== Job {job_id} completed successfully with {len(output_files)} stems in {time_str} ===")
+        
+        # Clean up from active_processes
+        with process_lock:
+            if job_id in active_processes:
+                del active_processes[job_id]
         
         return jsonify({
             'status': 'completed',

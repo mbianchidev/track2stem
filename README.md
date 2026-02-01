@@ -7,8 +7,12 @@ Turn any track into multi-stem with track2stem - a powerful music separator that
 - **Multi-format Support**: Upload MP3, WAV, FLAC, OGG, M4A, and AAC files
 - **AI-Powered Separation**: Uses Demucs for high-quality audio separation
 - **6-Stem Output**: Get separate tracks for vocals, drums, bass, guitar, piano, and other instruments
+- **Isolate Mode**: Extract a single stem (e.g., vocals) + combined backing track
 - **Modern Architecture**: Docker Compose app with Go backend and React frontend
-- **Real-time Progress**: Track your jobs with live status updates
+- **Real-time Progress**: Track your jobs with live status updates and elapsed time
+- **Spectrogram Visualization**: View audio spectrograms for input and output files
+- **Persistent Job History**: Recent jobs survive page refreshes (stored in localStorage)
+- **Processing Time Tracking**: See how long each job took to complete
 - **Download Individual Stems**: Download each separated track independently
 
 ## Architecture

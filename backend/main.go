@@ -68,6 +68,7 @@ func main() {
 	router.HandleFunc("/api/health", healthHandler).Methods("GET")
 	router.HandleFunc("/api/upload", uploadHandler).Methods("POST")
 	router.HandleFunc("/api/jobs/{id}", getJobHandler).Methods("GET")
+	router.HandleFunc("/api/jobs/{id}", deleteJobHandler).Methods("DELETE")
 	router.HandleFunc("/api/jobs", listJobsHandler).Methods("GET")
 	router.HandleFunc("/api/download/{id}/{stem}", downloadHandler).Methods("GET")
 	router.HandleFunc("/api/processing-status/{id}", processingStatusHandler).Methods("GET")
@@ -295,6 +296,59 @@ func listJobsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(jobList)
+}
+
+func deleteJobHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	jobsMutex.RLock()
+	job, exists := jobs[jobID]
+	wasProcessing := exists && (job.Status == "pending" || job.Status == "processing")
+	jobsMutex.RUnlock()
+
+	// If job was processing, cancel it in the processor
+	if wasProcessing {
+		processorURL := os.Getenv("PROCESSOR_URL")
+		if processorURL == "" {
+			processorURL = "http://processor:5000"
+		}
+
+		// Call processor cancel endpoint
+		client := &http.Client{Timeout: 10 * time.Second}
+		cancelReq, err := http.NewRequest("POST", processorURL+"/cancel/"+jobID, nil)
+		if err == nil {
+			resp, err := client.Do(cancelReq)
+			if err != nil {
+				log.Printf("Failed to cancel job in processor: %v", err)
+			} else {
+				resp.Body.Close()
+				log.Printf("Cancelled job %s in processor", jobID)
+			}
+		}
+	}
+
+	jobsMutex.Lock()
+	job, exists = jobs[jobID]
+	if exists {
+		// Mark as cancelled/failed if still processing
+		if job.Status == "pending" || job.Status == "processing" {
+			job.Status = "failed"
+			job.Error = "Cancelled by user"
+			now := time.Now()
+			job.CompletedAt = &now
+		}
+		delete(jobs, jobID)
+	}
+	jobsMutex.Unlock()
+
+	if !exists {
+		http.Error(w, "Job not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
 func processingStatusHandler(w http.ResponseWriter, r *http.Request) {
