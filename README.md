@@ -1,26 +1,17 @@
 # Track2stem 🎵
 
-Turn any track into multi-stem with track2stem - a powerful music separator that splits audio files into individual stems (vocals, drums, bass, guitar, piano, and other instruments).
+A powerful music separator that splits audio files into individual stems (vocals, drums, bass, guitar, piano, and other instruments) using AI-powered source separation.
 
 ## Features
 
-- **Multi-format Support**: Upload MP3, WAV, FLAC, OGG, M4A, and AAC files
-- **AI-Powered Separation**: Uses Demucs for high-quality audio separation
-- **6-Stem Output**: Get separate tracks for vocals, drums, bass, guitar, piano, and other instruments
-- **Isolate Mode**: Extract a single stem (e.g., vocals) + combined backing track
-- **Modern Architecture**: Docker Compose app with Go backend and React frontend
-- **Real-time Progress**: Track your jobs with live status updates and elapsed time
-- **Spectrogram Visualization**: View audio spectrograms for input and output files
-- **Persistent Job History**: Recent jobs survive page refreshes (stored in localStorage)
-- **Processing Time Tracking**: See how long each job took to complete
-- **Download Individual Stems**: Download each separated track independently
-
-## Architecture
-
-- **Frontend**: React + modern UI
-- **Backend**: Golang REST API
-- **Processor**: Python + Demucs (Facebook Research)
-- **Deployment**: Docker Compose
+- **Multi-format Support**: MP3, WAV, FLAC, OGG, M4A, and AAC
+- **AI-Powered Separation**: Uses Facebook Research's Demucs model
+- **6-Stem Output**: Vocals, drums, bass, guitar, piano, and other instruments
+- **Isolate Mode**: Extract a single stem + combined backing track
+- **Real-time Progress**: Live status updates with elapsed time tracking
+- **Spectrogram Visualization**: View audio spectrograms for input and output
+- **Persistent Job History**: Recent jobs survive page refreshes (localStorage)
+- **Individual Downloads**: Download each separated track independently
 
 ## Quick Start
 
@@ -30,56 +21,75 @@ Turn any track into multi-stem with track2stem - a powerful music separator that
 - At least 8GB RAM recommended
 - 5GB free disk space for models
 
-### Running the Application
+### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/mbianchidev/track2stem.git
 cd track2stem
-```
-
-2. Start all services with Docker Compose:
-```bash
 docker-compose up --build
 ```
 
-3. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080
+Access the application:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8080
 
-### First Run Note
+> **Note**: On first run, Demucs downloads ~2GB of pre-trained models. This is a one-time operation.
 
-On the first run, Demucs will download pre-trained models (~2GB). This is a one-time operation that may take several minutes depending on your internet connection.
+### Usage
 
-## Usage
+1. Open http://localhost:3000
+2. Upload an audio file (drag-and-drop or click to select)
+3. Wait for processing (1-5 minutes depending on song length)
+4. Download individual stems
 
-1. Open your browser to http://localhost:3000
-2. Click "Choose File" and select an audio file (mp3, wav, flac, etc.)
-3. Click "Upload & Process"
-4. Wait for the processing to complete (typically 1-5 minutes per song)
-5. Download individual stems (vocals, drums, bass, guitar, piano, other)
+## Architecture
 
-## API Endpoints
+A 3-tier Docker Compose application:
 
-### Upload Audio File
+| Service | Technology | Purpose |
+|---------|------------|---------|
+| Frontend | React 18 + Nginx | Modern UI with drag-and-drop upload |
+| Backend | Go 1.21 + Gorilla Mux | REST API and job management |
+| Processor | Python 3.10 + Demucs 4.0 | AI-powered audio separation |
+
+### How It Works
+
+1. User uploads audio file → Frontend
+2. Frontend sends file → Backend API
+3. Backend creates job, forwards to → Processor
+4. Processor runs Demucs separation
+5. Backend updates job status to "completed"
+6. User downloads individual stems
+
+## API Reference
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/upload` | Upload audio file for processing |
+| `GET` | `/api/jobs` | List all jobs |
+| `GET` | `/api/jobs/{id}` | Get specific job status |
+| `GET` | `/api/download/{id}/{stem}` | Download separated stem |
+| `GET` | `/api/health` | Health check |
+
+### Examples
+
 ```bash
-POST /api/upload
-Content-Type: multipart/form-data
-Body: file (audio file)
+# Upload a file
+curl -X POST http://localhost:8080/api/upload -F "file=@song.mp3"
 
-Response: {
-  "id": "job-uuid",
-  "status": "pending",
-  "filename": "song.mp3",
-  "created_at": "2024-01-01T00:00:00Z"
-}
+# Check job status
+curl http://localhost:8080/api/jobs/{job-id}
+
+# Download vocals stem
+curl -O http://localhost:8080/api/download/{job-id}/vocals
 ```
 
-### Get Job Status
-```bash
-GET /api/jobs/{id}
+### Response Format
 
-Response: {
+```json
+{
   "id": "job-uuid",
   "status": "completed",
   "filename": "song.mp3",
@@ -96,141 +106,126 @@ Response: {
 }
 ```
 
-### Download Stem
-```bash
-GET /api/download/{job_id}/{stem}
-stem: vocals | drums | bass | guitar | piano | other
-
-Response: Audio file (WAV format)
-```
-
-### List All Jobs
-```bash
-GET /api/jobs
-
-Response: [
-  { "id": "...", "status": "...", ... }
-]
-```
-
 ## Development
 
-### Backend (Golang)
+### Using Make Commands
 
 ```bash
-cd backend
-go mod download
-go run main.go
+make up        # Start all services
+make down      # Stop services
+make logs      # View logs
+make build     # Rebuild containers
+./health-check.sh  # Check service health
 ```
 
-### Frontend (React)
+### Running Services Individually
 
+**Backend (Go)**
 ```bash
-cd frontend
-npm install
-npm start
+cd backend && go mod download && go run main.go
 ```
 
-### Processor (Python)
-
+**Frontend (React)**
 ```bash
-cd processor
-pip install -r requirements.txt
-python app.py
+cd frontend && npm install && npm start
 ```
 
-## Technology Stack
+**Processor (Python)**
+```bash
+cd processor && pip install -r requirements.txt && python app.py
+```
 
-- **Frontend**: React 18, Axios, CSS3
-- **Backend**: Go 1.21, Gorilla Mux
-- **Audio Processing**: Python 3.10, Demucs 4.0, Flask
-- **Containerization**: Docker, Docker Compose
-- **Audio Library**: FFmpeg
+## Project Structure
 
-## References
+```
+track2stem/
+├── backend/                # Go API service
+│   ├── Dockerfile
+│   ├── go.mod
+│   └── main.go
+├── frontend/               # React UI
+│   ├── src/
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── package.json
+├── processor/              # Python + Demucs
+│   ├── Dockerfile
+│   ├── app.py
+│   └── requirements.txt
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── Makefile
+└── health-check.sh
+```
 
-This project leverages state-of-the-art audio separation technology:
+## Performance
 
-1. [Demucs](https://github.com/facebookresearch/demucs) - Facebook Research's music source separation model
-2. [Spleeter](https://github.com/deezer/spleeter) - Deezer's source separation library
-3. [Audio Separation Research](https://github.com/set-soft/AudioSeparation)
+| Metric | Value |
+|--------|-------|
+| Processing Time | 1-5 min per song |
+| Memory Usage | 2-4GB during processing |
+| Model Size | ~2GB (downloaded once) |
+| Output Format | High-quality WAV |
+| Max File Size | 100MB |
 
-## Contributing
+## Security
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-See LICENSE file for details.
-
-## Acknowledgments
-
-- Demucs by Facebook Research for the audio separation model
-- The open-source audio processing community
+- Filename sanitization (path traversal prevention)
+- CORS configuration for controlled access
+- Client and server-side file type validation
+- 30-minute processing timeout
+- Secure file handling via werkzeug
 
 ## Troubleshooting
 
 ### Services won't start
-
-**Problem**: Docker containers fail to start
-
-**Solutions**:
-- Ensure Docker is running: `docker info`
-- Check port availability: `lsof -i :3000,8080,5000` (on Unix)
-- Review logs: `docker compose logs`
-- Try rebuilding: `docker compose build --no-cache`
+```bash
+docker info              # Ensure Docker is running
+lsof -i :3000,8080,5000  # Check port availability
+docker compose logs      # Review logs
+docker compose build --no-cache  # Rebuild
+```
 
 ### First run is slow
+Normal behavior—Demucs downloads ~2GB of models on first run.
 
-**Problem**: Initial processing takes a very long time
-
-**Solution**: This is normal! On first run, Demucs downloads ~2GB of pre-trained models. Subsequent runs will be much faster.
-
-### Out of memory errors
-
-**Problem**: Container crashes with memory errors
-
-**Solutions**:
-- Increase Docker memory limit (8GB recommended)
+### Out of memory
+- Increase Docker memory limit to 8GB+
 - Process shorter audio files
-- Reduce concurrent jobs
 
-### Audio quality issues
-
-**Problem**: Separated stems have artifacts or poor quality
-
-**Solutions**:
-- Use high-quality input files (WAV/FLAC preferred over MP3)
-- Ensure input file isn't corrupted
-- Try different Demucs models by modifying `processor/app.py`
+### Poor audio quality
+- Use high-quality input (WAV/FLAC > MP3)
+- Try different Demucs models in `processor/app.py`
 
 ### Upload fails
+- Verify format: mp3, wav, flac, ogg, m4a, aac
+- Check file size < 100MB
+- Check disk space and backend logs
 
-**Problem**: File upload returns an error
+## Roadmap
 
-**Solutions**:
-- Check file format is supported (mp3, wav, flac, ogg, m4a, aac)
-- Verify file size is under 100MB
-- Check disk space on host machine
-- Review backend logs: `docker compose logs backend`
+- [ ] PostgreSQL/Redis for job persistence
+- [ ] User authentication (JWT)
+- [ ] Job queue with workers (RabbitMQ)
+- [ ] Rate limiting
+- [ ] File expiration and cleanup
+- [ ] Metrics (Prometheus/Grafana)
+- [ ] Object storage (S3/MinIO)
+- [ ] Desktop app (Tauri)
 
-### Can't access frontend
+## References
 
-**Problem**: Browser can't connect to http://localhost:3000
+- [Demucs](https://github.com/facebookresearch/demucs) - Facebook Research's music source separation
+- [Spleeter](https://github.com/deezer/spleeter) - Deezer's source separation library
 
-**Solutions**:
-- Verify frontend container is running: `docker compose ps`
-- Check for port conflicts: `lsof -i :3000`
-- Review frontend logs: `docker compose logs frontend`
-- Wait a minute - frontend may still be building
+## Contributing
 
-### Backend API errors
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Problem**: API requests fail
+## License
 
-**Solutions**:
-- Verify backend is healthy: `curl http://localhost:8080/api/health`
-- Check backend logs: `docker compose logs backend`
-- Ensure processor is running: `docker compose ps processor`
+See [LICENSE](LICENSE) file for details.
 
-For more issues, please check our [GitHub Issues](https://github.com/mbianchidev/track2stem/issues) page.
+## Acknowledgments
+
+- Facebook Research for the Demucs audio separation model
