@@ -607,7 +607,7 @@ def process_audio():
     except subprocess.TimeoutExpired:
         logger.error("Processing timeout exceeded")
         if job_id:
-            processing_status[j_id] = {'status': 'failed', 'progress': 0, 'stage': 'Timeout'}
+            processing_status[job_id] = {'status': 'failed', 'progress': 0, 'stage': 'Timeout'}
         return jsonify({'error': 'Processing timeout'}), 500
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
