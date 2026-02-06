@@ -1,5 +1,7 @@
 """Pytest configuration for processor tests."""
+import atexit
 import os
+import shutil
 import tempfile
 from unittest.mock import patch
 
@@ -9,6 +11,9 @@ _upload_dir = os.path.join(_test_dir, 'uploads')
 _output_dir = os.path.join(_test_dir, 'outputs')
 os.makedirs(_upload_dir, exist_ok=True)
 os.makedirs(_output_dir, exist_ok=True)
+
+# Clean up temp directories on process exit
+atexit.register(shutil.rmtree, _test_dir, True)
 
 # Patch os.makedirs during app import because the module creates /app/uploads
 # and /app/outputs at import time, which don't exist in the test environment.

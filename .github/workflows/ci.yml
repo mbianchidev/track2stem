@@ -78,6 +78,30 @@ jobs:
       - name: Run tests
         run: go test -v -race -timeout=5m ./...
 
+  processor:
+    name: Processor Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: processor
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test dependencies
+        run: pip install flask werkzeug pytest
+
+      - name: Run tests
+        run: python -m pytest test_app.py -v
+
   docker:
     name: Docker Compose Validation & Build
     runs-on: ubuntu-latest

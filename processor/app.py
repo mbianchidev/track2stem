@@ -11,7 +11,7 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import shutil
 
-# Validation pattern for job IDs: alphanumeric characters and hyphens only (UUID format)
+# Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
 ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav'}
 ALLOWED_STEM_MODES = {'all', 'isolate'}
@@ -30,9 +30,15 @@ def safe_join(base_dir, *paths):
     joined = os.path.join(base_dir, *paths)
     real_base = os.path.realpath(base_dir)
     real_joined = os.path.realpath(joined)
-    if not real_joined.startswith(real_base + os.sep):
+    try:
+        common = os.path.commonpath([real_base, real_joined])
+    except ValueError:
+        # Raised, for example, if paths are on different drives on Windows
         raise ValueError(f"Path traversal detected: {joined} escapes {base_dir}")
-    return joined
+    if common != real_base:
+        raise ValueError(f"Path traversal detected: {joined} escapes {base_dir}")
+    # Return the normalized, verified-safe path
+    return real_joined
 
 # Configure logging
 logging.basicConfig(
@@ -146,8 +152,8 @@ def process_audio():
         file = request.files['file']
         job_id = request.form.get('job_id', 'unknown')
         output_format = request.form.get('output_format', 'mp3').lower()  # mp3 or wav
-        stem_mode = request.form.get('stem_mode', 'all')  # 'all' or 'isolate'
-        isolate_stem = request.form.get('isolate_stem', 'vocals')  # which stem to isolate
+        stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
+        isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
         
         # Validate user inputs to prevent injection and path traversal
         if not validate_job_id(job_id):

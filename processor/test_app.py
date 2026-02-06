@@ -68,11 +68,11 @@ class TestSafeJoin:
 
     def test_normal_join(self):
         result = safe_join('/app/uploads', 'test.mp3')
-        assert result == '/app/uploads/test.mp3'
+        assert result == os.path.realpath('/app/uploads/test.mp3')
 
     def test_nested_join(self):
         result = safe_join('/app/outputs', 'job123', 'stem.mp3')
-        assert result == '/app/outputs/job123/stem.mp3'
+        assert result == os.path.realpath('/app/outputs/job123/stem.mp3')
 
     def test_path_traversal_raises(self):
         with pytest.raises(ValueError, match="Path traversal detected"):
