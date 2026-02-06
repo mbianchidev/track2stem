@@ -37,6 +37,7 @@
   },
   "proxy": "http://localhost:8080",
   "overrides": {
+    "jsonpath": ">=1.2.1",
     "nth-check": ">=2.0.1",
     "postcss": ">=8.4.31",
     "webpack-dev-server": "^4.15.2",
