@@ -11,6 +11,35 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import shutil
 
+# Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
+JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
+ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav'}
+ALLOWED_STEM_MODES = {'all', 'isolate'}
+ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
+
+
+def validate_job_id(job_id):
+    """Validate that job_id contains only safe characters (alphanumeric and hyphens)."""
+    if not job_id or not JOB_ID_PATTERN.match(job_id):
+        return False
+    return True
+
+
+def safe_join(base_dir, *paths):
+    """Safely join paths and ensure the result stays within the base directory."""
+    joined = os.path.join(base_dir, *paths)
+    real_base = os.path.realpath(base_dir)
+    real_joined = os.path.realpath(joined)
+    try:
+        common = os.path.commonpath([real_base, real_joined])
+    except ValueError:
+        # Raised, for example, if paths are on different drives on Windows
+        raise ValueError(f"Path traversal detected: {joined} escapes {base_dir}")
+    if common != real_base:
+        raise ValueError(f"Path traversal detected: {joined} escapes {base_dir}")
+    # Return the normalized, verified-safe path
+    return real_joined
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +77,8 @@ def health():
 @app.route('/status/<job_id>', methods=['GET'])
 def get_status(job_id):
     """Get processing status for a job"""
+    if not validate_job_id(job_id):
+        return jsonify({'error': 'Invalid job ID'}), 400
     if job_id in processing_status:
         return jsonify(processing_status[job_id])
     return jsonify({'status': 'unknown', 'progress': 0})
@@ -55,6 +86,8 @@ def get_status(job_id):
 @app.route('/cancel/<job_id>', methods=['POST'])
 def cancel_job(job_id):
     """Cancel a running job by killing its subprocess"""
+    if not validate_job_id(job_id):
+        return jsonify({'error': 'Invalid job ID'}), 400
     logger.info(f"Cancel request received for job: {job_id}")
     
     with process_lock:
@@ -92,7 +125,7 @@ def cancel_job(job_id):
             processing_status[job_id] = {'status': 'cancelled', 'progress': 0, 'stage': 'Cancelled by user'}
             
             # Clean up any partial files
-            job_output_dir = os.path.join(OUTPUT_FOLDER, job_id)
+            job_output_dir = safe_join(OUTPUT_FOLDER, job_id)
             if os.path.exists(job_output_dir):
                 try:
                     shutil.rmtree(job_output_dir)
@@ -119,8 +152,26 @@ def process_audio():
         file = request.files['file']
         job_id = request.form.get('job_id', 'unknown')
         output_format = request.form.get('output_format', 'mp3').lower()  # mp3 or wav
-        stem_mode = request.form.get('stem_mode', 'all')  # 'all' or 'isolate'
-        isolate_stem = request.form.get('isolate_stem', 'vocals')  # which stem to isolate
+        stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
+        isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
+        
+        # Validate user inputs to prevent injection and path traversal
+        if not validate_job_id(job_id):
+            logger.error(f"Invalid job ID: {job_id}")
+            return jsonify({'error': 'Invalid job ID'}), 400
+        
+        if output_format not in ALLOWED_OUTPUT_FORMATS:
+            logger.error(f"Invalid output format: {output_format}")
+            return jsonify({'error': 'Invalid output format'}), 400
+        
+        if stem_mode not in ALLOWED_STEM_MODES:
+            logger.error(f"Invalid stem mode: {stem_mode}")
+            return jsonify({'error': 'Invalid stem mode'}), 400
+        
+        if isolate_stem not in ALLOWED_STEMS:
+            logger.error(f"Invalid isolate stem: {isolate_stem}")
+            return jsonify({'error': 'Invalid isolate stem'}), 400
+        
         logger.info(f"Job ID: {job_id}, Filename: {file.filename}, Format: {output_format}, Mode: {stem_mode}, Isolate: {isolate_stem}")
         
         # Initialize status
@@ -149,7 +200,7 @@ def process_audio():
         else:
             original_filename = filename
         
-        input_path = os.path.join(UPLOAD_FOLDER, f"{job_id}_{original_filename}")
+        input_path = safe_join(UPLOAD_FOLDER, f"{job_id}_{original_filename}")
         logger.info(f"Saving file to: {input_path}")
         logger.info(f"Original filename: {original_filename}")
         file.save(input_path)
@@ -160,7 +211,7 @@ def process_audio():
         processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': 'File saved, starting separation'}
         
         # Create output directory for this job
-        job_output_dir = os.path.join(OUTPUT_FOLDER, job_id)
+        job_output_dir = safe_join(OUTPUT_FOLDER, job_id)
         os.makedirs(job_output_dir, exist_ok=True)
         logger.info(f"Output directory created: {job_output_dir}")
         
@@ -417,13 +468,13 @@ def process_audio():
         # Demucs creates: OUTPUT_FOLDER/htdemucs_6s/filename_without_ext/stem.mp3 (or .wav)
         # Use the original filename with job_id prefix consistently
         filename_no_ext = os.path.splitext(f"{job_id}_{original_filename}")[0]
-        demucs_output = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s', filename_no_ext)
+        demucs_output = safe_join(OUTPUT_FOLDER, 'htdemucs_6s', filename_no_ext)
         
         logger.info(f"Looking for output in: {demucs_output}")
         
         if not os.path.exists(demucs_output):
             # Try alternate paths for htdemucs_6s
-            alt_path = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s', os.path.splitext(filename)[0])
+            alt_path = safe_join(OUTPUT_FOLDER, 'htdemucs_6s', os.path.splitext(filename)[0])
             logger.info(f"Trying alternate path: {alt_path}")
             if os.path.exists(alt_path):
                 demucs_output = alt_path
