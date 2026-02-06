@@ -30,7 +30,7 @@ def safe_join(base_dir, *paths):
     joined = os.path.join(base_dir, *paths)
     real_base = os.path.realpath(base_dir)
     real_joined = os.path.realpath(joined)
-    if not real_joined.startswith(real_base + os.sep) and real_joined != real_base:
+    if not real_joined.startswith(real_base + os.sep):
         raise ValueError(f"Path traversal detected: {joined} escapes {base_dir}")
     return joined
 

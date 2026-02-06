@@ -10,7 +10,8 @@ _output_dir = os.path.join(_test_dir, 'outputs')
 os.makedirs(_upload_dir, exist_ok=True)
 os.makedirs(_output_dir, exist_ok=True)
 
-# Patch module-level directory creation and folder constants before app import
+# Patch os.makedirs during app import because the module creates /app/uploads
+# and /app/outputs at import time, which don't exist in the test environment.
 with patch('os.makedirs'):
     import app as app_module
     app_module.UPLOAD_FOLDER = _upload_dir
