@@ -613,8 +613,8 @@ def process_audio():
         logger.error(f"Unexpected error: {str(e)}")
         logger.error(traceback.format_exc())
         if job_id:
-            processing_status[job_id] = {'status': 'failed', 'progress': 0, 'stage': f'Error: {str(e)}'}
-        return jsonify({'error': str(e)}), 500
+            processing_status[job_id] = {'status': 'failed', 'progress': 0, 'stage': 'Error'}
+        return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
