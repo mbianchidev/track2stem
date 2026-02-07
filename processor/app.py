@@ -193,12 +193,12 @@ def cancel_job(job_id):
             return jsonify({'status': 'not_found', 'job_id': job_id}), 404
 
 @app.route('/process', methods=['POST'])
-def process_audio():
-    logger.info("=== Starting new processing request ===")
-    job_id = None
     start_time = time.time()  # Track processing time
     
     try:
+        if isolate_stem not in ALLOWED_STEMS:
+            logger.error(f"Invalid isolate_stem value: {isolate_stem}")
+            return jsonify({'error': 'Invalid isolate_stem value'}), 400
         if 'file' not in request.files:
             logger.error("No file in request")
             return jsonify({'error': 'No file provided'}), 400
