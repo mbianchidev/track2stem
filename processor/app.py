@@ -80,14 +80,18 @@ def is_wav_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in WAV_EXTENSIONS
 
 def convert_to_flac(src_path, dst_path):
-    """Convert an audio file to FLAC format using ffmpeg."""
+    """Convert an audio file to FLAC format using ffmpeg.
+    
+    On success the original source file is removed.
+    On failure a RuntimeError is raised and the source file is kept.
+    """
     ffmpeg_cmd = ['ffmpeg', '-y', '-i', src_path, dst_path]
     logger.info(f"Converting to FLAC: {' '.join(ffmpeg_cmd)}")
     result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         logger.error(f"FLAC conversion failed: {result.stderr}")
         raise RuntimeError(f"FLAC conversion failed for {src_path}")
-    # Remove original file after successful conversion
+    # Conversion succeeded – clean up the intermediate file
     if os.path.exists(src_path):
         os.remove(src_path)
 
