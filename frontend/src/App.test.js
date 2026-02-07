@@ -93,4 +93,53 @@ describe('App', () => {
     // Selector should now be visible
     expect(screen.getByText(/Choose stem to isolate/i)).toBeInTheDocument();
   });
+
+  test('renders conversion settings with format options and model selector', () => {
+    render(<App />);
+    expect(screen.getByText(/Conversion Settings/i)).toBeInTheDocument();
+    expect(screen.getByText('MP3')).toBeInTheDocument();
+    expect(screen.getByText('WAV')).toBeInTheDocument();
+    expect(screen.getByText('FLAC')).toBeInTheDocument();
+    expect(screen.getByLabelText(/AI Model/i)).toBeInTheDocument();
+  });
+
+  test('output format radio buttons switch correctly', () => {
+    render(<App />);
+    const mp3Radio = screen.getByRole('radio', { name: 'MP3' });
+    const wavRadio = screen.getByRole('radio', { name: 'WAV' });
+    const flacRadio = screen.getByRole('radio', { name: 'FLAC' });
+
+    expect(mp3Radio).toBeChecked();
+    fireEvent.click(flacRadio);
+    expect(flacRadio).toBeChecked();
+    expect(mp3Radio).not.toBeChecked();
+    fireEvent.click(wavRadio);
+    expect(wavRadio).toBeChecked();
+  });
+
+  test('advanced tuning panel toggles on button click', () => {
+    render(<App />);
+    const toggleBtn = screen.getByRole('button', { name: /Advanced Tuning/i });
+    expect(screen.queryByLabelText(/Segment Size/i)).not.toBeInTheDocument();
+
+    fireEvent.click(toggleBtn);
+    expect(screen.getByLabelText(/Segment Size/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Overlap/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Shifts/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Clip Mode/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Hide Advanced/i }));
+    expect(screen.queryByLabelText(/Segment Size/i)).not.toBeInTheDocument();
+  });
+
+  test('model change updates stem count label', () => {
+    render(<App />);
+    expect(screen.getByText(/All 6 Stems/i)).toBeInTheDocument();
+
+    const modelSelect = screen.getByLabelText(/AI Model/i);
+    fireEvent.change(modelSelect, { target: { value: 'htdemucs' } });
+
+    expect(screen.getByText(/All 4 Stems/i)).toBeInTheDocument();
+    expect(screen.queryByText(/All 6 Stems/i)).not.toBeInTheDocument();
+  });
 });

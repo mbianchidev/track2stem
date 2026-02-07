@@ -13,9 +13,18 @@ import shutil
 
 # Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
-ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav'}
+ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav', 'flac'}
 ALLOWED_STEM_MODES = {'all', 'isolate'}
 ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
+ALLOWED_MODELS = {
+    'htdemucs', 'htdemucs_ft', 'htdemucs_6s', 'hdemucs_mmi',
+    'mdx', 'mdx_extra', 'mdx_q', 'mdx_extra_q',
+}
+SIX_STEM_MODELS = {'htdemucs_6s'}
+ALLOWED_CLIP_MODES = {'rescale', 'clamp'}
+ALLOWED_SHIFTS = set(range(0, 11))  # 0-10
+ALLOWED_SEGMENTS = {None, 8, 10, 15, 20, 25, 30, 40, 60}
+ALLOWED_OVERLAPS = {None, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5}
 
 
 def validate_job_id(job_id):
@@ -69,6 +78,18 @@ def allowed_file(filename):
 
 def is_wav_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in WAV_EXTENSIONS
+
+def convert_to_flac(src_path, dst_path):
+    """Convert an audio file to FLAC format using ffmpeg."""
+    ffmpeg_cmd = ['ffmpeg', '-y', '-i', src_path, dst_path]
+    logger.info(f"Converting to FLAC: {' '.join(ffmpeg_cmd)}")
+    result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        logger.error(f"FLAC conversion failed: {result.stderr}")
+        raise RuntimeError(f"FLAC conversion failed for {src_path}")
+    # Remove original file after successful conversion
+    if os.path.exists(src_path):
+        os.remove(src_path)
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -151,9 +172,33 @@ def process_audio():
         
         file = request.files['file']
         job_id = request.form.get('job_id', 'unknown')
-        output_format = request.form.get('output_format', 'mp3').lower()  # mp3 or wav
+        output_format = request.form.get('output_format', 'mp3').lower()  # mp3, wav, or flac
         stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
         isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
+        model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
+        clip_mode = request.form.get('clip_mode', 'rescale').lower()  # rescale or clamp
+        
+        # Parse numeric options with safe defaults
+        try:
+            shifts = int(request.form.get('shifts', '0'))
+        except (ValueError, TypeError):
+            shifts = 0
+        
+        segment_raw = request.form.get('segment', '')
+        segment = None
+        if segment_raw:
+            try:
+                segment = int(segment_raw)
+            except (ValueError, TypeError):
+                segment = None
+        
+        overlap_raw = request.form.get('overlap', '')
+        overlap = None
+        if overlap_raw:
+            try:
+                overlap = float(overlap_raw)
+            except (ValueError, TypeError):
+                overlap = None
         
         # Validate user inputs to prevent injection and path traversal
         if not validate_job_id(job_id):
@@ -172,7 +217,27 @@ def process_audio():
             logger.error(f"Invalid isolate stem: {isolate_stem}")
             return jsonify({'error': 'Invalid isolate stem'}), 400
         
-        logger.info(f"Job ID: {job_id}, Filename: {file.filename}, Format: {output_format}, Mode: {stem_mode}, Isolate: {isolate_stem}")
+        if model not in ALLOWED_MODELS:
+            logger.error(f"Invalid model: {model}")
+            return jsonify({'error': 'Invalid model'}), 400
+        
+        if clip_mode not in ALLOWED_CLIP_MODES:
+            logger.error(f"Invalid clip mode: {clip_mode}")
+            return jsonify({'error': 'Invalid clip mode'}), 400
+        
+        if shifts not in ALLOWED_SHIFTS:
+            logger.error(f"Invalid shifts value: {shifts}")
+            return jsonify({'error': 'Invalid shifts value'}), 400
+        
+        if segment is not None and segment not in ALLOWED_SEGMENTS:
+            logger.error(f"Invalid segment value: {segment}")
+            return jsonify({'error': 'Invalid segment value'}), 400
+        
+        if overlap is not None and overlap not in ALLOWED_OVERLAPS:
+            logger.error(f"Invalid overlap value: {overlap}")
+            return jsonify({'error': 'Invalid overlap value'}), 400
+        
+        logger.info(f"Job ID: {job_id}, Filename: {file.filename}, Format: {output_format}, Mode: {stem_mode}, Isolate: {isolate_stem}, Model: {model}")
         
         # Initialize status
         processing_status[job_id] = {'status': 'uploading', 'progress': 5, 'stage': 'Receiving file'}
@@ -185,11 +250,16 @@ def process_audio():
             logger.error(f"File type not allowed: {file.filename}")
             return jsonify({'error': 'File type not allowed'}), 400
         
-        # Determine output format: WAV only if input is WAV and user requested WAV
-        input_is_wav = is_wav_file(file.filename)
-        use_wav_output = (output_format == 'wav' and input_is_wav)
-        actual_output_format = 'wav' if use_wav_output else 'mp3'
-        logger.info(f"Input is WAV: {input_is_wav}, Output format: {actual_output_format}")
+        # Determine output format
+        # For demucs: use WAV output when user requests wav or flac (flac converted after)
+        # Use MP3 output when user requests mp3
+        if output_format == 'mp3':
+            demucs_output_fmt = 'mp3'
+        else:
+            # WAV and FLAC both use WAV from demucs; FLAC is converted afterwards
+            demucs_output_fmt = 'wav'
+        actual_output_format = output_format
+        logger.info(f"Requested format: {output_format}, Demucs output: {demucs_output_fmt}")
         
         # Save uploaded file
         filename = secure_filename(file.filename)
@@ -216,24 +286,38 @@ def process_audio():
         logger.info(f"Output directory created: {job_output_dir}")
         
         # Run Demucs separation
-        processing_status[job_id] = {'status': 'processing', 'progress': 15, 'stage': 'Loading AI model (htdemucs_6s)'}
-        logger.info("Starting Demucs separation with htdemucs_6s model (6 stems)...")
+        processing_status[job_id] = {'status': 'processing', 'progress': 15, 'stage': f'Loading AI model ({model})'}
+        logger.info(f"Starting Demucs separation with {model} model...")
         
-        # Using htdemucs_6s model for 6 stems: vocals, drums, bass, guitar, piano, other
-        # We'll expose 5 main stems: vocals, drums, guitar, bass, other (piano optional)
         cmd = [
             'python', '-m', 'demucs',
             '-o', OUTPUT_FOLDER,
-            '-n', 'htdemucs_6s',  # 6 stems model for guitar separation
+            '-n', model,
         ]
         
         # Add format-specific options
-        if not use_wav_output:
+        if demucs_output_fmt == 'mp3':
             cmd.extend([
                 '--mp3',
                 '--mp3-bitrate', '320',  # Highest quality MP3 (320 kbps)
             ])
-        # For WAV output, demucs outputs WAV by default (no --mp3 flag)
+        # For WAV/FLAC output, demucs outputs WAV by default (no --mp3 flag)
+        
+        # Add clip mode
+        if clip_mode == 'clamp':
+            cmd.extend(['--clip-mode', 'clamp'])
+        
+        # Add shifts (shift trick for better quality, N times slower)
+        if shifts > 0:
+            cmd.extend(['--shifts', str(shifts)])
+        
+        # Add segment size (for memory management)
+        if segment is not None:
+            cmd.extend(['--segment', str(segment)])
+        
+        # Add overlap
+        if overlap is not None:
+            cmd.extend(['--overlap', str(overlap)])
         
         cmd.append(input_path)
         
@@ -465,34 +549,37 @@ def process_audio():
         processing_status[job_id] = {'status': 'processing', 'progress': 90, 'stage': 'AI separation complete, organizing files...', 'elapsed': format_elapsed(elapsed)}
         logger.info("Demucs completed successfully, organizing output files...")
         
-        # Demucs creates: OUTPUT_FOLDER/htdemucs_6s/filename_without_ext/stem.mp3 (or .wav)
+        # Demucs creates: OUTPUT_FOLDER/{model}/filename_without_ext/stem.mp3 (or .wav)
         # Use the original filename with job_id prefix consistently
         filename_no_ext = os.path.splitext(f"{job_id}_{original_filename}")[0]
-        demucs_output = safe_join(OUTPUT_FOLDER, 'htdemucs_6s', filename_no_ext)
+        demucs_output = safe_join(OUTPUT_FOLDER, model, filename_no_ext)
         
         logger.info(f"Looking for output in: {demucs_output}")
         
         if not os.path.exists(demucs_output):
-            # Try alternate paths for htdemucs_6s
-            alt_path = safe_join(OUTPUT_FOLDER, 'htdemucs_6s', os.path.splitext(filename)[0])
+            # Try alternate paths for the model
+            alt_path = safe_join(OUTPUT_FOLDER, model, os.path.splitext(filename)[0])
             logger.info(f"Trying alternate path: {alt_path}")
             if os.path.exists(alt_path):
                 demucs_output = alt_path
             else:
                 # List what's actually there
-                htdemucs_dir = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s')
-                if os.path.exists(htdemucs_dir):
-                    contents = os.listdir(htdemucs_dir)
-                    logger.info(f"Contents of htdemucs_6s dir: {contents}")
+                model_dir = os.path.join(OUTPUT_FOLDER, model)
+                if os.path.exists(model_dir):
+                    contents = os.listdir(model_dir)
+                    logger.info(f"Contents of {model} dir: {contents}")
                     if contents:
-                        demucs_output = os.path.join(htdemucs_dir, contents[0])
+                        demucs_output = os.path.join(model_dir, contents[0])
                         logger.info(f"Using first directory: {demucs_output}")
         
         # Move files to job output directory and collect paths
         output_files = {}
-        # htdemucs_6s produces 6 stems: vocals, drums, bass, guitar, piano, other
-        all_stems = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']
-        output_ext = 'wav' if use_wav_output else 'mp3'
+        # Determine available stems based on model
+        if model in SIX_STEM_MODELS:
+            all_stems = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']
+        else:
+            all_stems = ['vocals', 'drums', 'bass', 'other']
+        demucs_ext = 'wav' if demucs_output_fmt == 'wav' else 'mp3'
         
         # Get original filename without extension for naming output files
         original_name_no_ext = os.path.splitext(original_filename)[0]
@@ -502,13 +589,18 @@ def process_audio():
             logger.info(f"Isolate mode: extracting {isolate_stem} and combining the rest")
             
             # First, get the isolated stem
-            for ext in [output_ext, 'mp3', 'wav']:
+            for ext in [demucs_ext, 'mp3', 'wav']:
                 src = os.path.join(demucs_output, f"{isolate_stem}.{ext}")
                 if os.path.exists(src):
-                    dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.{ext}"
-                    dst = os.path.join(job_output_dir, dst_filename)
-                    logger.info(f"Moving isolated stem {src} to {dst}")
-                    shutil.move(src, dst)
+                    if actual_output_format == 'flac':
+                        dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.flac"
+                        dst = os.path.join(job_output_dir, dst_filename)
+                        convert_to_flac(src, dst)
+                    else:
+                        dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.{ext}"
+                        dst = os.path.join(job_output_dir, dst_filename)
+                        shutil.move(src, dst)
+                    logger.info(f"Isolated stem saved: {dst}")
                     output_files[isolate_stem] = dst
                     break
             
@@ -517,7 +609,7 @@ def process_audio():
             other_stems = [s for s in all_stems if s != isolate_stem]
             stem_files = []
             for stem in other_stems:
-                for ext in [output_ext, 'mp3', 'wav']:
+                for ext in [demucs_ext, 'mp3', 'wav']:
                     src = os.path.join(demucs_output, f"{stem}.{ext}")
                     if os.path.exists(src):
                         stem_files.append(src)
@@ -526,7 +618,7 @@ def process_audio():
             if stem_files:
                 # Use ffmpeg to mix the remaining stems
                 backing_name = "instrumental" if isolate_stem == "vocals" else "backing"
-                dst_filename = f"{original_name_no_ext}_t2s_{backing_name}.{output_ext}"
+                dst_filename = f"{original_name_no_ext}_t2s_{backing_name}.{actual_output_format}"
                 dst = os.path.join(job_output_dir, dst_filename)
                 
                 # Build ffmpeg command to mix multiple audio files
@@ -540,7 +632,7 @@ def process_audio():
                 ffmpeg_cmd.extend(['-filter_complex', filter_complex])
                 
                 # Output settings
-                if output_ext == 'mp3':
+                if actual_output_format == 'mp3':
                     ffmpeg_cmd.extend(['-b:a', '320k'])
                 ffmpeg_cmd.append(dst)
                 
@@ -553,15 +645,20 @@ def process_audio():
                 else:
                     logger.error(f"FFmpeg mix failed: {mix_result.stderr}")
         else:
-            # All stems mode: output all 6 stems
+            # All stems mode: output all stems
             for stem in all_stems:
-                for ext in [output_ext, 'mp3', 'wav']:
+                for ext in [demucs_ext, 'mp3', 'wav']:
                     src = os.path.join(demucs_output, f"{stem}.{ext}")
                     if os.path.exists(src):
-                        dst_filename = f"{original_name_no_ext}_t2s_{stem}.{ext}"
-                        dst = os.path.join(job_output_dir, dst_filename)
-                        logger.info(f"Moving {src} to {dst}")
-                        shutil.move(src, dst)
+                        if actual_output_format == 'flac':
+                            dst_filename = f"{original_name_no_ext}_t2s_{stem}.flac"
+                            dst = os.path.join(job_output_dir, dst_filename)
+                            convert_to_flac(src, dst)
+                        else:
+                            dst_filename = f"{original_name_no_ext}_t2s_{stem}.{ext}"
+                            dst = os.path.join(job_output_dir, dst_filename)
+                            shutil.move(src, dst)
+                        logger.info(f"Stem saved: {dst}")
                         output_files[stem] = dst
                         break
         
@@ -572,7 +669,7 @@ def process_audio():
         # Clean up demucs directory
         if os.path.exists(demucs_output):
             shutil.rmtree(demucs_output)
-        parent_dir = os.path.join(OUTPUT_FOLDER, 'htdemucs_6s')
+        parent_dir = os.path.join(OUTPUT_FOLDER, model)
         if os.path.exists(parent_dir) and not os.listdir(parent_dir):
             os.rmdir(parent_dir)
         

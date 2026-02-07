@@ -27,9 +27,15 @@ type Job struct {
 	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
 	Error          string            `json:"error,omitempty"`
 	OutputFiles    map[string]string `json:"output_files,omitempty"`
-	StemMode       string            `json:"stem_mode,omitempty"`       // "all" or "isolate"
-	IsolateStem    string            `json:"isolate_stem,omitempty"`    // which stem to isolate
-	ProcessingTime string            `json:"processing_time,omitempty"` // total processing time
+	StemMode       string            `json:"stem_mode,omitempty"`        // "all" or "isolate"
+	IsolateStem    string            `json:"isolate_stem,omitempty"`     // which stem to isolate
+	ProcessingTime string            `json:"processing_time,omitempty"`  // total processing time
+	OutputFormat   string            `json:"output_format,omitempty"`    // mp3, wav, flac
+	Model          string            `json:"model,omitempty"`            // demucs model name
+	Segment        string            `json:"segment,omitempty"`          // segment size for memory management
+	Overlap        string            `json:"overlap,omitempty"`          // overlap between prediction windows
+	Shifts         string            `json:"shifts,omitempty"`           // shift trick for better quality
+	ClipMode       string            `json:"clip_mode,omitempty"`        // rescale or clamp
 }
 
 var (
@@ -157,16 +163,42 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		isolateStem = "vocals"
 	}
 
+	// Get advanced options from form
+	outputFormat := r.FormValue("output_format")
+	if outputFormat == "" {
+		outputFormat = "mp3"
+	}
+	model := r.FormValue("model")
+	if model == "" {
+		model = "htdemucs_6s"
+	}
+	segment := r.FormValue("segment")
+	overlap := r.FormValue("overlap")
+	shifts := r.FormValue("shifts")
+	if shifts == "" {
+		shifts = "0"
+	}
+	clipMode := r.FormValue("clip_mode")
+	if clipMode == "" {
+		clipMode = "rescale"
+	}
+
 	// Create job
 	jobID := uuid.New().String()
 	safeFilename := sanitizeFilename(header.Filename)
 	job := &Job{
-		ID:          jobID,
-		Status:      "pending",
-		FileName:    safeFilename,
-		CreatedAt:   time.Now(),
-		StemMode:    stemMode,
-		IsolateStem: isolateStem,
+		ID:           jobID,
+		Status:       "pending",
+		FileName:     safeFilename,
+		CreatedAt:    time.Now(),
+		StemMode:     stemMode,
+		IsolateStem:  isolateStem,
+		OutputFormat: outputFormat,
+		Model:        model,
+		Segment:      segment,
+		Overlap:      overlap,
+		Shifts:       shifts,
+		ClipMode:     clipMode,
 	}
 
 	jobsMutex.Lock()
@@ -192,13 +224,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start processing in background
-	go processJob(jobID, uploadPath, stemMode, isolateStem)
+	go processJob(jobID, uploadPath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(job)
 }
 
-func processJob(jobID, filePath, stemMode, isolateStem string) {
+func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode string) {
 	jobsMutex.Lock()
 	job := jobs[jobID]
 	job.Status = "processing"
@@ -234,10 +266,20 @@ func processJob(jobID, filePath, stemMode, isolateStem string) {
 		return
 	}
 
-	// Add job_id and stem options
+	// Add job_id, stem options, and advanced options
 	writer.WriteField("job_id", jobID)
 	writer.WriteField("stem_mode", stemMode)
 	writer.WriteField("isolate_stem", isolateStem)
+	writer.WriteField("output_format", outputFormat)
+	writer.WriteField("model", model)
+	writer.WriteField("shifts", shifts)
+	writer.WriteField("clip_mode", clipMode)
+	if segment != "" {
+		writer.WriteField("segment", segment)
+	}
+	if overlap != "" {
+		writer.WriteField("overlap", overlap)
+	}
 	writer.Close()
 
 	// Send request

@@ -11,6 +11,12 @@ from app import (
     ALLOWED_STEMS,
     ALLOWED_OUTPUT_FORMATS,
     ALLOWED_STEM_MODES,
+    ALLOWED_MODELS,
+    ALLOWED_CLIP_MODES,
+    ALLOWED_SHIFTS,
+    ALLOWED_SEGMENTS,
+    ALLOWED_OVERLAPS,
+    SIX_STEM_MODELS,
 )
 
 
@@ -172,3 +178,107 @@ class TestEndpointValidation:
         assert resp.status_code == 400
         body = json.loads(resp.data)
         assert body['error'] == 'Invalid isolate stem'
+
+    def test_process_invalid_model(self, client):
+        data = {
+            'job_id': 'valid-job-456',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'model': 'evil_model; rm -rf /',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid model'
+
+    def test_process_invalid_clip_mode(self, client):
+        data = {
+            'job_id': 'valid-job-789',
+            'output_format': 'wav',
+            'stem_mode': 'all',
+            'clip_mode': 'delete',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid clip mode'
+
+    def test_process_invalid_shifts(self, client):
+        data = {
+            'job_id': 'valid-job-aaa',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'shifts': '99',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid shifts value'
+
+    def test_process_invalid_segment(self, client):
+        data = {
+            'job_id': 'valid-job-bbb',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'segment': '999',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid segment value'
+
+    def test_process_invalid_overlap(self, client):
+        data = {
+            'job_id': 'valid-job-ccc',
+            'output_format': 'flac',
+            'stem_mode': 'all',
+            'overlap': '0.99',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid overlap value'
+
+    def test_process_flac_format_accepted(self, client):
+        """Verify 'flac' is accepted by the output_format validator."""
+        assert 'flac' in ALLOWED_OUTPUT_FORMATS
+
+    def test_process_valid_model_accepted(self, client):
+        """All expected model names should be in the allowlist."""
+        expected = {'htdemucs', 'htdemucs_ft', 'htdemucs_6s',
+                    'hdemucs_mmi', 'mdx', 'mdx_extra',
+                    'mdx_q', 'mdx_extra_q'}
+        assert expected == ALLOWED_MODELS
+
+
+class TestModelStemMapping:
+    """Verify stem counts per model family."""
+
+    def test_six_stem_model_set(self):
+        assert 'htdemucs_6s' in SIX_STEM_MODELS
+
+    def test_four_stem_models_not_in_six(self):
+        four_stem = {'htdemucs', 'htdemucs_ft', 'hdemucs_mmi',
+                     'mdx', 'mdx_extra', 'mdx_q', 'mdx_extra_q'}
+        for m in four_stem:
+            assert m not in SIX_STEM_MODELS
