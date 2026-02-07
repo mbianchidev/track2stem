@@ -27,9 +27,15 @@ type Job struct {
 	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
 	Error          string            `json:"error,omitempty"`
 	OutputFiles    map[string]string `json:"output_files,omitempty"`
-	StemMode       string            `json:"stem_mode,omitempty"`       // "all" or "isolate"
-	IsolateStem    string            `json:"isolate_stem,omitempty"`    // which stem to isolate
-	ProcessingTime string            `json:"processing_time,omitempty"` // total processing time
+	StemMode       string            `json:"stem_mode,omitempty"`        // "all" or "isolate"
+	IsolateStem    string            `json:"isolate_stem,omitempty"`     // which stem to isolate
+	ProcessingTime string            `json:"processing_time,omitempty"`  // total processing time
+	OutputFormat   string            `json:"output_format,omitempty"`    // mp3, wav, flac
+	Model          string            `json:"model,omitempty"`            // demucs model name
+	Segment        string            `json:"segment,omitempty"`          // segment size for memory management
+	Overlap        string            `json:"overlap,omitempty"`          // overlap between prediction windows
+	Shifts         string            `json:"shifts,omitempty"`           // shift trick for better quality
+	ClipMode       string            `json:"clip_mode,omitempty"`        // rescale or clamp
 }
 
 var (
@@ -38,6 +44,26 @@ var (
 	// In-memory job storage: jobs are lost on container restart
 	// For production, consider using a database or persistent storage
 )
+
+// jobIDPattern validates that job IDs only contain UUID-safe characters
+var jobIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$`)
+
+// Allowlists for user-supplied form values (defense-in-depth; processor also validates)
+var (
+	allowedOutputFormats = map[string]bool{"mp3": true, "wav": true, "flac": true}
+	allowedStemModes     = map[string]bool{"all": true, "isolate": true}
+	allowedStems         = map[string]bool{"vocals": true, "drums": true, "bass": true, "guitar": true, "piano": true, "other": true}
+	allowedModels        = map[string]bool{
+		"htdemucs": true, "htdemucs_ft": true, "htdemucs_6s": true, "hdemucs_mmi": true,
+		"mdx": true, "mdx_extra": true, "mdx_q": true, "mdx_extra_q": true,
+	}
+	allowedClipModes = map[string]bool{"rescale": true, "clamp": true}
+)
+
+// isValidJobID checks that a job ID contains only alphanumeric chars and hyphens
+func isValidJobID(id string) bool {
+	return jobIDPattern.MatchString(id)
+}
 
 // sanitizeFilename removes dangerous characters from filenames to prevent path traversal
 func sanitizeFilename(filename string) string {
@@ -52,6 +78,16 @@ func sanitizeFilename(filename string) string {
 		filename = filename[:255-len(ext)] + ext
 	}
 	return filename
+}
+
+// safeOutputPath validates that a file path is rooted under /app/outputs
+func safeOutputPath(path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	cleaned := filepath.Clean(absPath)
+	return strings.HasPrefix(cleaned, "/app/outputs/")
 }
 
 func main() {
@@ -157,16 +193,64 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		isolateStem = "vocals"
 	}
 
+	// Get advanced options from form
+	outputFormat := r.FormValue("output_format")
+	if outputFormat == "" {
+		outputFormat = "mp3"
+	}
+	model := r.FormValue("model")
+	if model == "" {
+		model = "htdemucs_6s"
+	}
+	segment := r.FormValue("segment")
+	overlap := r.FormValue("overlap")
+	shifts := r.FormValue("shifts")
+	if shifts == "" {
+		shifts = "0"
+	}
+	clipMode := r.FormValue("clip_mode")
+	if clipMode == "" {
+		clipMode = "rescale"
+	}
+
+	// Validate all user-supplied options against allowlists
+	if !allowedStemModes[stemMode] {
+		http.Error(w, "Invalid stem_mode value", http.StatusBadRequest)
+		return
+	}
+	if stemMode == "isolate" && !allowedStems[isolateStem] {
+		http.Error(w, "Invalid isolate_stem value", http.StatusBadRequest)
+		return
+	}
+	if !allowedOutputFormats[outputFormat] {
+		http.Error(w, "Invalid output_format value", http.StatusBadRequest)
+		return
+	}
+	if !allowedModels[model] {
+		http.Error(w, "Invalid model value", http.StatusBadRequest)
+		return
+	}
+	if !allowedClipModes[clipMode] {
+		http.Error(w, "Invalid clip_mode value", http.StatusBadRequest)
+		return
+	}
+
 	// Create job
 	jobID := uuid.New().String()
 	safeFilename := sanitizeFilename(header.Filename)
 	job := &Job{
-		ID:          jobID,
-		Status:      "pending",
-		FileName:    safeFilename,
-		CreatedAt:   time.Now(),
-		StemMode:    stemMode,
-		IsolateStem: isolateStem,
+		ID:           jobID,
+		Status:       "pending",
+		FileName:     safeFilename,
+		CreatedAt:    time.Now(),
+		StemMode:     stemMode,
+		IsolateStem:  isolateStem,
+		OutputFormat: outputFormat,
+		Model:        model,
+		Segment:      segment,
+		Overlap:      overlap,
+		Shifts:       shifts,
+		ClipMode:     clipMode,
 	}
 
 	jobsMutex.Lock()
@@ -192,13 +276,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start processing in background
-	go processJob(jobID, uploadPath, stemMode, isolateStem)
+	go processJob(jobID, uploadPath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(job)
 }
 
-func processJob(jobID, filePath, stemMode, isolateStem string) {
+func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode string) {
 	jobsMutex.Lock()
 	job := jobs[jobID]
 	job.Status = "processing"
@@ -234,10 +318,20 @@ func processJob(jobID, filePath, stemMode, isolateStem string) {
 		return
 	}
 
-	// Add job_id and stem options
+	// Add job_id, stem options, and advanced options
 	writer.WriteField("job_id", jobID)
 	writer.WriteField("stem_mode", stemMode)
 	writer.WriteField("isolate_stem", isolateStem)
+	writer.WriteField("output_format", outputFormat)
+	writer.WriteField("model", model)
+	writer.WriteField("shifts", shifts)
+	writer.WriteField("clip_mode", clipMode)
+	if segment != "" {
+		writer.WriteField("segment", segment)
+	}
+	if overlap != "" {
+		writer.WriteField("overlap", overlap)
+	}
 	writer.Close()
 
 	// Send request
@@ -308,6 +402,11 @@ func getJobHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
 	jobsMutex.RUnlock()
@@ -336,6 +435,11 @@ func listJobsHandler(w http.ResponseWriter, r *http.Request) {
 func deleteJobHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
+
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
 
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
@@ -390,6 +494,11 @@ func processingStatusHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	// Get processing status from processor service
 	processorURL := os.Getenv("PROCESSOR_URL")
 	if processorURL == "" {
@@ -421,6 +530,11 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	jobID := vars["id"]
 	stem := vars["stem"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
 	jobsMutex.RUnlock()
@@ -438,6 +552,13 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	filePath, exists := job.OutputFiles[stem]
 	if !exists {
 		http.Error(w, "Stem not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify the file path stays within the expected output directory
+	if !safeOutputPath(filePath) {
+		log.Printf("Blocked path traversal attempt in download: %s", filePath)
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
 		return
 	}
 

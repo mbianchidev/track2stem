@@ -24,10 +24,24 @@ function App() {
   const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
   const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
   const [isInitialized, setIsInitialized] = useState(false); // Track if localStorage has been loaded
+  const [showAdvanced, setShowAdvanced] = useState(false); // Toggle advanced options
+
+  // Advanced options
+  const [outputFormat, setOutputFormat] = useState('mp3');
+  const [model, setModel] = useState('htdemucs_6s');
+  const [segment, setSegment] = useState('');
+  const [overlap, setOverlap] = useState('0.25');
+  const [shifts, setShifts] = useState('0');
+  const [clipMode, setClipMode] = useState('rescale');
+
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
 
   const API_BASE = process.env.REACT_APP_API_URL || '/api';
+
+  // Models that produce 6 stems (guitar + piano)
+  const SIX_STEM_MODELS = ['htdemucs_6s'];
+  const isSixStemModel = SIX_STEM_MODELS.includes(model);
 
   // Format elapsed time as Xm Ys
   const formatElapsedTime = (seconds) => {
@@ -223,13 +237,22 @@ function App() {
       const validExtensions = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'];
       const extension = selectedFile.name.split('.').pop().toLowerCase();
       
-      if (validTypes.includes(selectedFile.type) || validExtensions.includes(extension)) {
-        setFile(selectedFile);
-        setError('');
-      } else {
+      if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(extension)) {
         setError('Please select a valid audio file (mp3, wav, flac, ogg, m4a, aac)');
         setFile(null);
+        return;
       }
+
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(1);
+        setError(`File is too large (${sizeMB} MB). Maximum allowed size is 100 MB.`);
+        setFile(null);
+        return;
+      }
+
+      setFile(selectedFile);
+      setError('');
     }
   };
 
@@ -243,6 +266,16 @@ function App() {
     formData.append('file', file);
     formData.append('stem_mode', stemMode);
     formData.append('isolate_stem', isolateStem);
+    formData.append('output_format', outputFormat);
+    formData.append('model', model);
+    formData.append('shifts', shifts);
+    formData.append('clip_mode', clipMode);
+    if (segment) {
+      formData.append('segment', segment);
+    }
+    if (overlap) {
+      formData.append('overlap', overlap);
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -277,7 +310,20 @@ function App() {
       const fileInput = document.getElementById('file-input');
       if (fileInput) fileInput.value = '';
     } catch (err) {
-      setError('Upload failed: ' + (err.response?.data || err.message));
+      const status = err.response?.status;
+      const data = err.response?.data;
+      let message;
+
+      if (status === 413) {
+        message = 'File is too large. Maximum allowed size is 100 MB.';
+      } else if (typeof data === 'string' && data.includes('<html')) {
+        // Server returned an HTML error page — show a generic message
+        message = 'The server rejected the request. The file may be too large (max 100 MB).';
+      } else {
+        message = data || err.message;
+      }
+
+      setError('Upload failed: ' + message);
     } finally {
       setUploading(false);
     }
@@ -383,8 +429,8 @@ function App() {
                     onChange={(e) => setStemMode(e.target.value)}
                     disabled={uploading}
                   />
-                  <span className="mode-label">🎼 All 6 Stems</span>
-                  <span className="mode-desc">Vocals, Drums, Bass, Guitar, Piano, Other</span>
+                  <span className="mode-label">{isSixStemModel ? '🎼 All 6 Stems' : '🎼 All 4 Stems'}</span>
+                  <span className="mode-desc">{isSixStemModel ? 'Vocals, Drums, Bass, Guitar, Piano, Other' : 'Vocals, Drums, Bass, Other'}</span>
                 </label>
                 <label className={`mode-option ${stemMode === 'isolate' ? 'selected' : ''}`}>
                   <input
@@ -396,7 +442,7 @@ function App() {
                     disabled={uploading}
                   />
                   <span className="mode-label">🎤 Isolate One</span>
-                  <span className="mode-desc">Get one stem + everything else (great for covers)</span>
+                  <span className="mode-desc">Extract a single stem + combined backing track</span>
                 </label>
               </div>
               
@@ -411,9 +457,142 @@ function App() {
                     <option value="vocals">🎤 Vocals</option>
                     <option value="drums">🥁 Drums</option>
                     <option value="bass">🎸 Bass</option>
-                    <option value="guitar">🎸 Guitar</option>
-                    <option value="piano">🎹 Piano</option>
+                    {isSixStemModel && <option value="guitar">🎸 Guitar</option>}
+                    {isSixStemModel && <option value="piano">🎹 Piano</option>}
                   </select>
+                </div>
+              )}
+            </div>
+
+            {/* Conversion Settings */}
+            <div className="stem-options">
+              <h3>Conversion Settings</h3>
+              <div className="conversion-settings-grid">
+                <fieldset className="setting-group">
+                  <legend className="setting-label">Output Format</legend>
+                  <div className="format-radio-group" role="radiogroup" aria-label="Output Format">
+                    {['mp3', 'wav', 'flac'].map((fmt) => (
+                      <label key={fmt} className={`format-choice ${outputFormat === fmt ? 'active' : ''}`}>
+                        <input
+                          type="radio"
+                          name="outputFormat"
+                          value={fmt}
+                          checked={outputFormat === fmt}
+                          onChange={(e) => setOutputFormat(e.target.value)}
+                          disabled={uploading}
+                        />
+                        {fmt.toUpperCase()}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <div className="setting-group">
+                  <label className="setting-label" htmlFor="model-select">AI Model</label>
+                  <select
+                    id="model-select"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    disabled={uploading}
+                    className="setting-select"
+                  >
+                    <option value="htdemucs_6s">htdemucs_6s — 6 stems (guitar+piano)</option>
+                    <option value="htdemucs">htdemucs — Hybrid Transformer (default quality)</option>
+                    <option value="htdemucs_ft">htdemucs_ft — Fine-tuned (4× slower, better)</option>
+                    <option value="hdemucs_mmi">hdemucs_mmi — Hybrid v3</option>
+                    <option value="mdx">mdx — MDX challenge winner</option>
+                    <option value="mdx_extra">mdx_extra — MDX with extra training data</option>
+                    <option value="mdx_q">mdx_q — MDX quantized (smaller)</option>
+                    <option value="mdx_extra_q">mdx_extra_q — MDX extra quantized</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Collapsible advanced tuning */}
+              <button
+                type="button"
+                className="advanced-toggle"
+                onClick={() => setShowAdvanced((v) => !v)}
+              >
+                {showAdvanced ? '▾ Hide Advanced' : '▸ Advanced Tuning'}
+              </button>
+
+              {showAdvanced && (
+                <div className="advanced-options-panel">
+                  <div className="conversion-settings-grid">
+                    <div className="setting-group">
+                      <label className="setting-label" htmlFor="segment-select">Segment Size</label>
+                      <select
+                        id="segment-select"
+                        value={segment}
+                        onChange={(e) => setSegment(e.target.value)}
+                        disabled={uploading}
+                        className="setting-select"
+                      >
+                        <option value="">Default</option>
+                        <option value="8">8 s (low memory)</option>
+                        <option value="10">10 s</option>
+                        <option value="15">15 s</option>
+                        <option value="20">20 s</option>
+                        <option value="25">25 s</option>
+                        <option value="30">30 s</option>
+                        <option value="40">40 s</option>
+                        <option value="60">60 s (high memory)</option>
+                      </select>
+                    </div>
+
+                    <div className="setting-group">
+                      <label className="setting-label" htmlFor="overlap-select">Overlap</label>
+                      <select
+                        id="overlap-select"
+                        value={overlap}
+                        onChange={(e) => setOverlap(e.target.value)}
+                        disabled={uploading}
+                        className="setting-select"
+                      >
+                        <option value="">Default</option>
+                        <option value="0.1">0.10 (fastest)</option>
+                        <option value="0.15">0.15</option>
+                        <option value="0.2">0.20</option>
+                        <option value="0.25">0.25 (recommended)</option>
+                        <option value="0.3">0.30</option>
+                        <option value="0.35">0.35</option>
+                        <option value="0.4">0.40</option>
+                        <option value="0.5">0.50 (best quality)</option>
+                      </select>
+                    </div>
+
+                    <div className="setting-group">
+                      <label className="setting-label" htmlFor="shifts-select">Shifts (quality)</label>
+                      <select
+                        id="shifts-select"
+                        value={shifts}
+                        onChange={(e) => setShifts(e.target.value)}
+                        disabled={uploading}
+                        className="setting-select"
+                      >
+                        <option value="0">0 — off (fastest)</option>
+                        <option value="1">1 — 2× slower</option>
+                        <option value="2">2 — 3× slower</option>
+                        <option value="5">5 — 6× slower</option>
+                        <option value="10">10 — 11× slower</option>
+                      </select>
+                    </div>
+
+                    <div className="setting-group">
+                      <label className="setting-label" htmlFor="clip-mode-select">Clip Mode</label>
+                      <select
+                        id="clip-mode-select"
+                        value={clipMode}
+                        onChange={(e) => setClipMode(e.target.value)}
+                        disabled={uploading}
+                        className="setting-select"
+                      >
+                        <option value="rescale">Rescale (preserve relative volume)</option>
+                        <option value="clamp">Clamp (hard clip)</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
