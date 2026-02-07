@@ -237,13 +237,22 @@ function App() {
       const validExtensions = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'];
       const extension = selectedFile.name.split('.').pop().toLowerCase();
       
-      if (validTypes.includes(selectedFile.type) || validExtensions.includes(extension)) {
-        setFile(selectedFile);
-        setError('');
-      } else {
+      if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(extension)) {
         setError('Please select a valid audio file (mp3, wav, flac, ogg, m4a, aac)');
         setFile(null);
+        return;
       }
+
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(1);
+        setError(`File is too large (${sizeMB} MB). Maximum allowed size is 100 MB.`);
+        setFile(null);
+        return;
+      }
+
+      setFile(selectedFile);
+      setError('');
     }
   };
 
@@ -301,7 +310,20 @@ function App() {
       const fileInput = document.getElementById('file-input');
       if (fileInput) fileInput.value = '';
     } catch (err) {
-      setError('Upload failed: ' + (err.response?.data || err.message));
+      const status = err.response?.status;
+      const data = err.response?.data;
+      let message;
+
+      if (status === 413) {
+        message = 'File is too large. Maximum allowed size is 100 MB.';
+      } else if (typeof data === 'string' && data.includes('<html')) {
+        // Server returned an HTML error page — show a generic message
+        message = 'The server rejected the request. The file may be too large (max 100 MB).';
+      } else {
+        message = data || err.message;
+      }
+
+      setError('Upload failed: ' + message);
     } finally {
       setUploading(false);
     }

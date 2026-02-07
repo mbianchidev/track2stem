@@ -257,15 +257,27 @@
 }
 
 .isolate-selector select {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-xl) var(--space-sm) var(--space-md);
   border: 2px solid var(--color-border-secondary);
   border-radius: var(--radius-md);
   font-size: 1rem;
   font-family: var(--font-body);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1.4 0L6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-md) center;
+  background-size: 12px 8px;
   color: var(--color-text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.isolate-selector select option {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 .isolate-selector select:hover {
@@ -954,15 +966,30 @@
 }
 
 .setting-select {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-xl) var(--space-sm) var(--space-md);
   border: 2px solid var(--color-border-secondary);
   border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-family: var(--font-body);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1.4 0L6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-md) center;
+  background-size: 12px 8px;
   color: var(--color-text-primary);
   cursor: pointer;
   transition: border-color var(--transition-fast);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.setting-select option {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: var(--space-sm);
 }
 
 .setting-select:hover {

@@ -265,7 +265,8 @@ def process_audio():
             logger.error(f"Invalid overlap value: {overlap}")
             return jsonify({'error': 'Invalid overlap value'}), 400
         
-        logger.info(f"Job ID: {job_id}, Filename: {file.filename}, Format: {output_format}, Mode: {stem_mode}, Isolate: {isolate_stem}, Model: {model}")
+        segment_str = f'{segment}s' if segment is not None else 'default'
+        logger.info(f"Job ID: {job_id}, File: {file.filename}, Model: {model}, Format: {output_format}, Mode: {stem_mode}, Isolate: {isolate_stem}, Segment: {segment_str}, Overlap: {overlap}, Shifts: {shifts}, Clip: {clip_mode}")
         
         # Initialize status
         processing_status[job_id] = {'status': 'uploading', 'progress': 5, 'stage': 'Receiving file'}
@@ -306,7 +307,7 @@ def process_audio():
         file_size = os.path.getsize(input_path)
         logger.info(f"File saved successfully. Size: {file_size / (1024*1024):.2f} MB")
         
-        processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': 'File saved, starting separation'}
+        processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': f'File saved ({original_filename}), starting separation with {model}'}
         
         # Create output directory for this job
         job_output_dir = safe_join(OUTPUT_FOLDER, job_id)
@@ -315,7 +316,8 @@ def process_audio():
         
         # Run Demucs separation
         processing_status[job_id] = {'status': 'processing', 'progress': 15, 'stage': f'Loading AI model ({model})'}
-        logger.info(f"Starting Demucs separation with {model} model...")
+        expected_stems = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'] if model in SIX_STEM_MODELS else ['vocals', 'drums', 'bass', 'other']
+        logger.info(f"Starting Demucs separation: file='{original_filename}', model={model}, segment={segment_str}, stems=[{', '.join(expected_stems)}]")
         
         cmd = [
             'python', '-m', 'demucs',
@@ -350,7 +352,7 @@ def process_audio():
         cmd.append(input_path)
         
         logger.info(f"Running command: {' '.join(cmd)}")
-        processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': 'Starting AI separation...'}
+        processing_status[job_id] = {'status': 'processing', 'progress': 10, 'stage': f'Starting AI separation of {original_filename} ({model}, segment {segment_str})...'}
         
         # Use PTY to capture tqdm progress output (tqdm uses \r for updates)
         # PTY makes demucs think it's writing to a terminal, so we get real-time updates
@@ -460,7 +462,7 @@ def process_audio():
                                 pct = int(progress_match.group(1))
                                 # Map demucs 0-100% to our 10-90%
                                 mapped = 10 + int(pct * 0.80)
-                                update_progress(mapped, f'Separating stems... ({mapped}%)')
+                                update_progress(mapped, f'Separating stems from {original_filename} [{model}]... ({mapped}%)')
                             except (ValueError, IndexError):
                                 pass
                         else:
@@ -574,8 +576,8 @@ def process_audio():
             }), 500
         
         elapsed = time.time() - start_time
-        processing_status[job_id] = {'status': 'processing', 'progress': 90, 'stage': 'AI separation complete, organizing files...', 'elapsed': format_elapsed(elapsed)}
-        logger.info("Demucs completed successfully, organizing output files...")
+        processing_status[job_id] = {'status': 'processing', 'progress': 90, 'stage': f'AI separation of {original_filename} complete, organizing files...', 'elapsed': format_elapsed(elapsed)}
+        logger.info(f"Demucs completed successfully for '{original_filename}' (model={model}, segment={segment_str}), organizing output files...")
         
         # Demucs creates: OUTPUT_FOLDER/{model}/filename_without_ext/stem.mp3 (or .wav)
         # Use the original filename with job_id prefix consistently
@@ -617,6 +619,7 @@ def process_audio():
             logger.info(f"Isolate mode: extracting {isolate_stem} and combining the rest")
             
             # First, get the isolated stem
+            logger.info(f"[Stem] Processing isolated stem: {isolate_stem}")
             for ext in [demucs_ext, 'mp3', 'wav']:
                 src = safe_join(demucs_output, f"{isolate_stem}.{ext}")
                 if os.path.exists(src):
@@ -646,6 +649,7 @@ def process_audio():
             if stem_files:
                 # Use ffmpeg to mix the remaining stems
                 backing_name = "instrumental" if isolate_stem == "vocals" else "backing"
+                logger.info(f"[Stem] Mixing remaining stems into {backing_name}: {', '.join(other_stems)}")
                 dst_filename = f"{original_name_no_ext}_t2s_{backing_name}.{actual_output_format}"
                 dst = safe_join(job_output_dir, dst_filename)
                 
@@ -684,6 +688,7 @@ def process_audio():
         else:
             # All stems mode: output all stems
             for stem in all_stems:
+                logger.info(f"[Stem] Processing stem: {stem}")
                 for ext in [demucs_ext, 'mp3', 'wav']:
                     src = safe_join(demucs_output, f"{stem}.{ext}")
                     if os.path.exists(src):
@@ -723,7 +728,7 @@ def process_audio():
         time_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
         
         processing_status[job_id] = {'status': 'completed', 'progress': 100, 'stage': 'Complete!', 'elapsed': time_str, 'total_time': time_str}
-        logger.info(f"=== Job {job_id} completed successfully with {len(output_files)} stems in {time_str} ===")
+        logger.info(f"=== Job {job_id} completed: file='{original_filename}', model={model}, segment={segment_str}, stems={len(output_files)}, time={time_str} ===")
         
         # Clean up from active_processes
         with process_lock:
