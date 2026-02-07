@@ -14,6 +14,8 @@ import shutil
 # Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
 ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav', 'flac'}
+# Allowed stem names to prevent path traversal or arbitrary file access
+ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'other', 'piano', 'guitar', 'strings', 'organ', 'all', 'isolate'}
 ALLOWED_STEM_MODES = {'all', 'isolate'}
 ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
 ALLOWED_MODELS = {
@@ -191,6 +193,9 @@ def process_audio():
         output_format = request.form.get('output_format', 'mp3').lower()  # mp3, wav, or flac
         if output_format not in ALLOWED_OUTPUT_FORMATS:
             logger.error(f"Invalid output format: {output_format}")
+        if isolate_stem not in ALLOWED_STEMS:
+            logger.error(f"Invalid isolate_stem value: {isolate_stem}")
+            return jsonify({'error': 'Invalid isolate_stem value'}), 400
             return jsonify({'error': 'Invalid output format'}), 400
         stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
         isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
