@@ -50,7 +50,7 @@ A 3-tier Docker Compose application:
 |---------|------------|---------|
 | Frontend | React 18 + Nginx | Modern UI with drag-and-drop upload |
 | Backend | Go 1.21 + Gorilla Mux | REST API and job management |
-| Processor | Python 3.13 + Demucs 4.0 | AI-powered audio separation |
+| Processor | Python 3.13 + Demucs 4.0.1 | AI-powered audio separation |
 
 ### How It Works
 
