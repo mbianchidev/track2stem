@@ -14,23 +14,6 @@ import shutil
 # Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
 ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav', 'flac'}
-
-# Base directory for all processing-related files. All file operations should stay within this tree.
-BASE_PROCESSING_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "jobs"))
-
-def safe_join(base_dir, *paths):
-    """
-    Join one or more path components to base_dir and ensure the resulting path
-    stays within BASE_PROCESSING_DIR to prevent directory traversal.
-    """
-    # Resolve the intended base directory against the global processing root
-    abs_base = os.path.realpath(os.path.join(BASE_PROCESSING_DIR, os.path.relpath(base_dir, BASE_PROCESSING_DIR)))
-    candidate = os.path.realpath(os.path.join(abs_base, *paths))
-    if not candidate.startswith(BASE_PROCESSING_DIR + os.sep) and candidate != BASE_PROCESSING_DIR:
-        raise ValueError("Attempted directory traversal outside of processing directory")
-    return candidate
-# Allowed stem names to prevent path traversal or arbitrary file access
-ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'other', 'piano', 'guitar', 'strings', 'organ', 'all', 'isolate'}
 ALLOWED_STEM_MODES = {'all', 'isolate'}
 ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
 ALLOWED_MODELS = {
@@ -193,12 +176,12 @@ def cancel_job(job_id):
             return jsonify({'status': 'not_found', 'job_id': job_id}), 404
 
 @app.route('/process', methods=['POST'])
+def process_audio():
+    logger.info("=== Starting new processing request ===")
+    job_id = None
     start_time = time.time()  # Track processing time
     
     try:
-        if isolate_stem not in ALLOWED_STEMS:
-            logger.error(f"Invalid isolate_stem value: {isolate_stem}")
-            return jsonify({'error': 'Invalid isolate_stem value'}), 400
         if 'file' not in request.files:
             logger.error("No file in request")
             return jsonify({'error': 'No file provided'}), 400
@@ -210,14 +193,6 @@ def cancel_job(job_id):
         isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
         model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
         clip_mode = request.form.get('clip_mode', 'rescale').lower()  # rescale or clamp
-
-        if output_format not in ALLOWED_OUTPUT_FORMATS:
-            logger.error(f"Invalid output format: {output_format}")
-            return jsonify({'error': 'Invalid output format'}), 400
-
-        if isolate_stem not in ALLOWED_STEMS:
-            logger.error(f"Invalid isolate_stem value: {isolate_stem}")
-            return jsonify({'error': 'Invalid isolate_stem value'}), 400
         
         # Parse numeric options – reject non-parseable values with 400
         shifts_raw = request.form.get('shifts')
@@ -643,15 +618,15 @@ def cancel_job(job_id):
             
             # First, get the isolated stem
             for ext in [demucs_ext, 'mp3', 'wav']:
-                src = safe_join(demucs_output, f"{isolate_stem}.{ext}")
+                src = os.path.join(demucs_output, f"{isolate_stem}.{ext}")
                 if os.path.exists(src):
                     if actual_output_format == 'flac':
                         dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.flac"
-                        dst = safe_join(job_output_dir, dst_filename)
+                        dst = os.path.join(job_output_dir, dst_filename)
                         convert_to_flac(src, dst)
                     else:
                         dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.{ext}"
-                        dst = safe_join(job_output_dir, dst_filename)
+                        dst = os.path.join(job_output_dir, dst_filename)
                         shutil.move(src, dst)
                     logger.info(f"Isolated stem saved: {dst}")
                     output_files[isolate_stem] = dst
