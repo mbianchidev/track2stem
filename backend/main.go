@@ -45,6 +45,26 @@ var (
 	// For production, consider using a database or persistent storage
 )
 
+// jobIDPattern validates that job IDs only contain UUID-safe characters
+var jobIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$`)
+
+// Allowlists for user-supplied form values (defense-in-depth; processor also validates)
+var (
+	allowedOutputFormats = map[string]bool{"mp3": true, "wav": true, "flac": true}
+	allowedStemModes     = map[string]bool{"all": true, "isolate": true}
+	allowedStems         = map[string]bool{"vocals": true, "drums": true, "bass": true, "guitar": true, "piano": true, "other": true}
+	allowedModels        = map[string]bool{
+		"htdemucs": true, "htdemucs_ft": true, "htdemucs_6s": true, "hdemucs_mmi": true,
+		"mdx": true, "mdx_extra": true, "mdx_q": true, "mdx_extra_q": true,
+	}
+	allowedClipModes = map[string]bool{"rescale": true, "clamp": true}
+)
+
+// isValidJobID checks that a job ID contains only alphanumeric chars and hyphens
+func isValidJobID(id string) bool {
+	return jobIDPattern.MatchString(id)
+}
+
 // sanitizeFilename removes dangerous characters from filenames to prevent path traversal
 func sanitizeFilename(filename string) string {
 	// Remove any path separators
@@ -58,6 +78,16 @@ func sanitizeFilename(filename string) string {
 		filename = filename[:255-len(ext)] + ext
 	}
 	return filename
+}
+
+// safeOutputPath validates that a file path is rooted under /app/outputs
+func safeOutputPath(path string) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	cleaned := filepath.Clean(absPath)
+	return strings.HasPrefix(cleaned, "/app/outputs/")
 }
 
 func main() {
@@ -181,6 +211,28 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	clipMode := r.FormValue("clip_mode")
 	if clipMode == "" {
 		clipMode = "rescale"
+	}
+
+	// Validate all user-supplied options against allowlists
+	if !allowedStemModes[stemMode] {
+		http.Error(w, "Invalid stem_mode value", http.StatusBadRequest)
+		return
+	}
+	if !allowedStems[isolateStem] {
+		http.Error(w, "Invalid isolate_stem value", http.StatusBadRequest)
+		return
+	}
+	if !allowedOutputFormats[outputFormat] {
+		http.Error(w, "Invalid output_format value", http.StatusBadRequest)
+		return
+	}
+	if !allowedModels[model] {
+		http.Error(w, "Invalid model value", http.StatusBadRequest)
+		return
+	}
+	if !allowedClipModes[clipMode] {
+		http.Error(w, "Invalid clip_mode value", http.StatusBadRequest)
+		return
 	}
 
 	// Create job
@@ -350,6 +402,11 @@ func getJobHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
 	jobsMutex.RUnlock()
@@ -378,6 +435,11 @@ func listJobsHandler(w http.ResponseWriter, r *http.Request) {
 func deleteJobHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
+
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
 
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
@@ -432,6 +494,11 @@ func processingStatusHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	// Get processing status from processor service
 	processorURL := os.Getenv("PROCESSOR_URL")
 	if processorURL == "" {
@@ -463,6 +530,11 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	jobID := vars["id"]
 	stem := vars["stem"]
 
+	if !isValidJobID(jobID) {
+		http.Error(w, "Invalid job ID", http.StatusBadRequest)
+		return
+	}
+
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
 	jobsMutex.RUnlock()
@@ -480,6 +552,13 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	filePath, exists := job.OutputFiles[stem]
 	if !exists {
 		http.Error(w, "Stem not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify the file path stays within the expected output directory
+	if !safeOutputPath(filePath) {
+		log.Printf("Blocked path traversal attempt in download: %s", filePath)
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
 		return
 	}
 

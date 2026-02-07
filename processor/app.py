@@ -618,15 +618,15 @@ def process_audio():
             
             # First, get the isolated stem
             for ext in [demucs_ext, 'mp3', 'wav']:
-                src = os.path.join(demucs_output, f"{isolate_stem}.{ext}")
+                src = safe_join(demucs_output, f"{isolate_stem}.{ext}")
                 if os.path.exists(src):
                     if actual_output_format == 'flac':
                         dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.flac"
-                        dst = os.path.join(job_output_dir, dst_filename)
+                        dst = safe_join(job_output_dir, dst_filename)
                         convert_to_flac(src, dst)
                     else:
                         dst_filename = f"{original_name_no_ext}_t2s_{isolate_stem}.{ext}"
-                        dst = os.path.join(job_output_dir, dst_filename)
+                        dst = safe_join(job_output_dir, dst_filename)
                         shutil.move(src, dst)
                     logger.info(f"Isolated stem saved: {dst}")
                     output_files[isolate_stem] = dst
@@ -638,7 +638,7 @@ def process_audio():
             stem_files = []
             for stem in other_stems:
                 for ext in [demucs_ext, 'mp3', 'wav']:
-                    src = os.path.join(demucs_output, f"{stem}.{ext}")
+                    src = safe_join(demucs_output, f"{stem}.{ext}")
                     if os.path.exists(src):
                         stem_files.append(src)
                         break
@@ -647,7 +647,7 @@ def process_audio():
                 # Use ffmpeg to mix the remaining stems
                 backing_name = "instrumental" if isolate_stem == "vocals" else "backing"
                 dst_filename = f"{original_name_no_ext}_t2s_{backing_name}.{actual_output_format}"
-                dst = os.path.join(job_output_dir, dst_filename)
+                dst = safe_join(job_output_dir, dst_filename)
                 
                 # Build ffmpeg command to mix multiple audio files
                 ffmpeg_cmd = ['ffmpeg', '-y']
@@ -685,15 +685,15 @@ def process_audio():
             # All stems mode: output all stems
             for stem in all_stems:
                 for ext in [demucs_ext, 'mp3', 'wav']:
-                    src = os.path.join(demucs_output, f"{stem}.{ext}")
+                    src = safe_join(demucs_output, f"{stem}.{ext}")
                     if os.path.exists(src):
                         if actual_output_format == 'flac':
                             dst_filename = f"{original_name_no_ext}_t2s_{stem}.flac"
-                            dst = os.path.join(job_output_dir, dst_filename)
+                            dst = safe_join(job_output_dir, dst_filename)
                             convert_to_flac(src, dst)
                         else:
                             dst_filename = f"{original_name_no_ext}_t2s_{stem}.{ext}"
-                            dst = os.path.join(job_output_dir, dst_filename)
+                            dst = safe_join(job_output_dir, dst_filename)
                             shutil.move(src, dst)
                         logger.info(f"Stem saved: {dst}")
                         output_files[stem] = dst
