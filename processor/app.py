@@ -102,7 +102,7 @@ def convert_to_flac(src_path, dst_path):
         if os.path.exists(dst_path):
             os.remove(dst_path)
         logger.error(f"FLAC conversion failed: {result.stderr}")
-        raise RuntimeError(f"FLAC conversion failed for {src_path}: {result.stderr}")
+        raise RuntimeError(f"FLAC conversion failed for {src_path}")
     # Conversion succeeded – clean up the intermediate file
     if os.path.exists(src_path):
         os.remove(src_path)
@@ -673,15 +673,14 @@ def process_audio():
                     if os.path.exists(dst):
                         os.remove(dst)
                     logger.error("FFmpeg mix timed out")
-                    mix_result = None
-                
-                if mix_result and mix_result.returncode == 0:
-                    output_files[backing_name] = dst
-                    logger.info(f"Created combined backing track: {dst}")
-                elif mix_result:
-                    if os.path.exists(dst):
-                        os.remove(dst)
-                    logger.error(f"FFmpeg mix failed: {mix_result.stderr}")
+                else:
+                    if mix_result.returncode == 0:
+                        output_files[backing_name] = dst
+                        logger.info(f"Created combined backing track: {dst}")
+                    else:
+                        if os.path.exists(dst):
+                            os.remove(dst)
+                        logger.error(f"FFmpeg mix failed: {mix_result.stderr}")
         else:
             # All stems mode: output all stems
             for stem in all_stems:

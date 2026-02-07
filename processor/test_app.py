@@ -268,7 +268,7 @@ class TestEndpointValidation:
         expected = {'htdemucs', 'htdemucs_ft', 'htdemucs_6s',
                     'hdemucs_mmi', 'mdx', 'mdx_extra',
                     'mdx_q', 'mdx_extra_q'}
-        assert expected and expected.issubset(ALLOWED_MODELS)
+        assert expected.issubset(ALLOWED_MODELS)
 
     def test_process_non_numeric_shifts(self, client):
         data = {
