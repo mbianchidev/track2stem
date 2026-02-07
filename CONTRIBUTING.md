@@ -20,7 +20,7 @@ Thank you for your interest in contributing to Track2stem! This document provide
 - Docker and Docker Compose
 - Go 1.21+ (for backend development)
 - Node.js 18+ (for frontend development)
-- Python 3.10+ (for processor development)
+- Python 3.13+ (for processor development)
 
 ### Running Locally
 
