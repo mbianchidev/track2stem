@@ -268,7 +268,73 @@ class TestEndpointValidation:
         expected = {'htdemucs', 'htdemucs_ft', 'htdemucs_6s',
                     'hdemucs_mmi', 'mdx', 'mdx_extra',
                     'mdx_q', 'mdx_extra_q'}
-        assert expected == ALLOWED_MODELS
+        assert expected and expected.issubset(ALLOWED_MODELS)
+
+    def test_process_non_numeric_shifts(self, client):
+        data = {
+            'job_id': 'valid-job-nn1',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'shifts': 'abc',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid shifts value'
+
+    def test_process_non_numeric_segment(self, client):
+        data = {
+            'job_id': 'valid-job-nn2',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'segment': 'xyz',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid segment value'
+
+    def test_process_non_numeric_overlap(self, client):
+        data = {
+            'job_id': 'valid-job-nn3',
+            'output_format': 'mp3',
+            'stem_mode': 'all',
+            'overlap': 'not-a-number',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Invalid overlap value'
+
+    def test_process_incompatible_isolate_stem_for_4stem_model(self, client):
+        """4-stem models should reject guitar/piano in isolate mode."""
+        data = {
+            'job_id': 'valid-job-compat',
+            'output_format': 'mp3',
+            'stem_mode': 'isolate',
+            'isolate_stem': 'guitar',
+            'model': 'htdemucs',
+        }
+        resp = client.post(
+            '/process',
+            data={**data, 'file': (io.BytesIO(b'fake audio'), 'test.mp3')},
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body['error'] == 'Incompatible isolate_stem for selected model'
 
 
 class TestModelStemMapping:

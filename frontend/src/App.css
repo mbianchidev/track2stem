@@ -940,6 +940,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  border: none;
+  padding: 0;
+  margin: 0;
 }
 
 .setting-label {

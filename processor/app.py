@@ -83,14 +83,26 @@ def convert_to_flac(src_path, dst_path):
     """Convert an audio file to FLAC format using ffmpeg.
     
     On success the original source file is removed.
-    On failure a RuntimeError is raised and the source file is kept.
+    On failure a RuntimeError is raised, any partial dst is cleaned up,
+    and the source file is kept.
     """
     ffmpeg_cmd = ['ffmpeg', '-y', '-i', src_path, dst_path]
     logger.info(f"Converting to FLAC: {' '.join(ffmpeg_cmd)}")
-    result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(
+            ffmpeg_cmd, capture_output=True, text=True, timeout=600
+        )
+    except subprocess.TimeoutExpired:
+        # Clean up partial output
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        raise RuntimeError(f"FLAC conversion timed out for {src_path}")
     if result.returncode != 0:
+        # Clean up partial output
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
         logger.error(f"FLAC conversion failed: {result.stderr}")
-        raise RuntimeError(f"FLAC conversion failed for {src_path}")
+        raise RuntimeError(f"FLAC conversion failed for {src_path}: {result.stderr}")
     # Conversion succeeded – clean up the intermediate file
     if os.path.exists(src_path):
         os.remove(src_path)
@@ -182,11 +194,16 @@ def process_audio():
         model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
         clip_mode = request.form.get('clip_mode', 'rescale').lower()  # rescale or clamp
         
-        # Parse numeric options with safe defaults
-        try:
-            shifts = int(request.form.get('shifts', '0'))
-        except (ValueError, TypeError):
+        # Parse numeric options – reject non-parseable values with 400
+        shifts_raw = request.form.get('shifts')
+        if shifts_raw is None or shifts_raw == '':
             shifts = 0
+        else:
+            try:
+                shifts = int(shifts_raw)
+            except (ValueError, TypeError):
+                logger.error(f"Invalid shifts value: {shifts_raw}")
+                return jsonify({'error': 'Invalid shifts value'}), 400
         
         segment_raw = request.form.get('segment', '')
         segment = None
@@ -194,7 +211,8 @@ def process_audio():
             try:
                 segment = int(segment_raw)
             except (ValueError, TypeError):
-                segment = None
+                logger.error(f"Invalid segment value: {segment_raw}")
+                return jsonify({'error': 'Invalid segment value'}), 400
         
         overlap_raw = request.form.get('overlap', '')
         overlap = None
@@ -202,7 +220,8 @@ def process_audio():
             try:
                 overlap = float(overlap_raw)
             except (ValueError, TypeError):
-                overlap = None
+                logger.error(f"Invalid overlap value: {overlap_raw}")
+                return jsonify({'error': 'Invalid overlap value'}), 400
         
         # Validate user inputs to prevent injection and path traversal
         if not validate_job_id(job_id):
@@ -224,6 +243,11 @@ def process_audio():
         if model not in ALLOWED_MODELS:
             logger.error(f"Invalid model: {model}")
             return jsonify({'error': 'Invalid model'}), 400
+        
+        # Ensure isolate_stem is compatible with the selected model
+        if model not in SIX_STEM_MODELS and isolate_stem in {'guitar', 'piano'}:
+            logger.error(f"Incompatible isolate stem '{isolate_stem}' for model '{model}'")
+            return jsonify({'error': 'Incompatible isolate_stem for selected model'}), 400
         
         if clip_mode not in ALLOWED_CLIP_MODES:
             logger.error(f"Invalid clip mode: {clip_mode}")
@@ -568,12 +592,12 @@ def process_audio():
                 demucs_output = alt_path
             else:
                 # List what's actually there
-                model_dir = os.path.join(OUTPUT_FOLDER, model)
+                model_dir = safe_join(OUTPUT_FOLDER, model)
                 if os.path.exists(model_dir):
                     contents = os.listdir(model_dir)
                     logger.info(f"Contents of {model} dir: {contents}")
                     if contents:
-                        demucs_output = os.path.join(model_dir, contents[0])
+                        demucs_output = safe_join(model_dir, contents[0])
                         logger.info(f"Using first directory: {demucs_output}")
         
         # Move files to job output directory and collect paths
@@ -641,12 +665,22 @@ def process_audio():
                 ffmpeg_cmd.append(dst)
                 
                 logger.info(f"Mixing stems with ffmpeg: {' '.join(ffmpeg_cmd)}")
-                mix_result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+                try:
+                    mix_result = subprocess.run(
+                        ffmpeg_cmd, capture_output=True, text=True, timeout=600
+                    )
+                except subprocess.TimeoutExpired:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+                    logger.error("FFmpeg mix timed out")
+                    mix_result = None
                 
-                if mix_result.returncode == 0:
+                if mix_result and mix_result.returncode == 0:
                     output_files[backing_name] = dst
                     logger.info(f"Created combined backing track: {dst}")
-                else:
+                elif mix_result:
+                    if os.path.exists(dst):
+                        os.remove(dst)
                     logger.error(f"FFmpeg mix failed: {mix_result.stderr}")
         else:
             # All stems mode: output all stems
@@ -673,7 +707,7 @@ def process_audio():
         # Clean up demucs directory
         if os.path.exists(demucs_output):
             shutil.rmtree(demucs_output)
-        parent_dir = os.path.join(OUTPUT_FOLDER, model)
+        parent_dir = safe_join(OUTPUT_FOLDER, model)
         if os.path.exists(parent_dir) and not os.listdir(parent_dir):
             os.rmdir(parent_dir)
         

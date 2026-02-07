@@ -446,9 +446,9 @@ function App() {
             <div className="stem-options">
               <h3>Conversion Settings</h3>
               <div className="conversion-settings-grid">
-                <div className="setting-group">
-                  <label className="setting-label" htmlFor="output-format-select">Output Format</label>
-                  <div className="format-radio-group">
+                <fieldset className="setting-group">
+                  <legend className="setting-label">Output Format</legend>
+                  <div className="format-radio-group" role="radiogroup" aria-label="Output Format">
                     {['mp3', 'wav', 'flac'].map((fmt) => (
                       <label key={fmt} className={`format-choice ${outputFormat === fmt ? 'active' : ''}`}>
                         <input
@@ -463,7 +463,7 @@ function App() {
                       </label>
                     ))}
                   </div>
-                </div>
+                </fieldset>
 
                 <div className="setting-group">
                   <label className="setting-label" htmlFor="model-select">AI Model</label>
