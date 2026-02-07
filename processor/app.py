@@ -189,6 +189,9 @@ def process_audio():
         file = request.files['file']
         job_id = request.form.get('job_id', 'unknown')
         output_format = request.form.get('output_format', 'mp3').lower()  # mp3, wav, or flac
+        if output_format not in ALLOWED_OUTPUT_FORMATS:
+            logger.error(f"Invalid output format: {output_format}")
+            return jsonify({'error': 'Invalid output format'}), 400
         stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
         isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
         model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
