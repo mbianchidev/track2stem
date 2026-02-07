@@ -218,7 +218,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid stem_mode value", http.StatusBadRequest)
 		return
 	}
-	if !allowedStems[isolateStem] {
+	if stemMode == "isolate" && !allowedStems[isolateStem] {
 		http.Error(w, "Invalid isolate_stem value", http.StatusBadRequest)
 		return
 	}
