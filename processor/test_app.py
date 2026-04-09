@@ -12,6 +12,7 @@ from app import (
     ALLOWED_OUTPUT_FORMATS,
     ALLOWED_STEM_MODES,
     ALLOWED_MODELS,
+    ALLOWED_DEMUCS_MODELS,
     ALLOWED_CLIP_MODES,
     ALLOWED_SHIFTS,
     ALLOWED_SEGMENTS,
@@ -193,7 +194,7 @@ class TestEndpointValidation:
         )
         assert resp.status_code == 400
         body = json.loads(resp.data)
-        assert body['error'] == f"Invalid model. Allowed: {sorted(ALLOWED_MODELS)}"
+        assert body['error'] == f"Invalid model. Allowed: {sorted(ALLOWED_DEMUCS_MODELS)}"
 
     def test_process_invalid_clip_mode(self, client):
         data = {
