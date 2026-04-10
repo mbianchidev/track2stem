@@ -205,7 +205,10 @@ def process_audio():
         model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
         if model not in ALLOWED_DEMUCS_MODELS:
             logger.error(f"Invalid model requested: {model}")
-            return jsonify({'error': f'Invalid model. Allowed: {sorted(ALLOWED_DEMUCS_MODELS)}'}), 400
+            return jsonify({
+                'error': 'Invalid model',
+                'allowed_models': sorted(ALLOWED_DEMUCS_MODELS),
+            }), 400
         clip_mode = request.form.get('clip_mode', 'rescale').lower()  # rescale or clamp
         
         # Parse numeric options – reject non-parseable values with 400

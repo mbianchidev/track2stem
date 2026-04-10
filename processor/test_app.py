@@ -194,7 +194,8 @@ class TestEndpointValidation:
         )
         assert resp.status_code == 400
         body = json.loads(resp.data)
-        assert body['error'] == f"Invalid model. Allowed: {sorted(ALLOWED_DEMUCS_MODELS)}"
+        assert body['error'] == 'Invalid model'
+        assert body['allowed_models'] == sorted(ALLOWED_DEMUCS_MODELS)
 
     def test_process_invalid_clip_mode(self, client):
         data = {
