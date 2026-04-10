@@ -14,6 +14,17 @@ import shutil
 # Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
 ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav', 'flac'}
+# Allowlisted Demucs models accepted from user input
+ALLOWED_DEMUCS_MODELS = {
+    'htdemucs',
+    'htdemucs_ft',
+    'htdemucs_6s',
+    'hdemucs_mmi',
+    'mdx',
+    'mdx_extra',
+    'mdx_q',
+    'mdx_extra_q',
+}
 ALLOWED_STEM_MODES = {'all', 'isolate'}
 ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
 ALLOWED_MODELS = {
@@ -192,6 +203,12 @@ def process_audio():
         stem_mode = request.form.get('stem_mode', 'all').lower()  # 'all' or 'isolate'
         isolate_stem = request.form.get('isolate_stem', 'vocals').lower()  # which stem to isolate
         model = request.form.get('model', 'htdemucs_6s').lower()  # demucs model
+        if model not in ALLOWED_DEMUCS_MODELS:
+            logger.error(f"Invalid model requested: {model}")
+            return jsonify({
+                'error': 'Invalid model',
+                'allowed_models': sorted(ALLOWED_DEMUCS_MODELS),
+            }), 400
         clip_mode = request.form.get('clip_mode', 'rescale').lower()  # rescale or clamp
         
         # Parse numeric options – reject non-parseable values with 400
