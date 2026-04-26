@@ -119,3 +119,17 @@ jobs:
 
       - name: Build all containers
         run: docker compose build
+
+      - name: Start containers and wait for healthy status
+        run: docker compose up -d --wait --wait-timeout 120
+
+      - name: Verify container health
+        run: docker compose ps
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down containers
+        if: always()
+        run: docker compose down -v
