@@ -152,7 +152,7 @@ def cancel_job(job_id):
             if master_fd:
                 try:
                     os.close(master_fd)
-                except:
+                except OSError:
                     pass
             
             if process and process.poll() is None:  # Still running
@@ -496,7 +496,7 @@ def process_audio():
                                             pct = int((curr / total) * 100)
                                             mapped = 10 + int(pct * 0.80)
                                             update_progress(mapped, f'Processing track {curr}/{total}... ({mapped}%)')
-                                    except:
+                                    except (ValueError, IndexError):
                                         pass
                                         
                 except Exception as e:
@@ -559,7 +559,7 @@ def process_audio():
             stop_threads.set()
             try:
                 os.close(master_fd)
-            except:
+            except OSError:
                 pass
             output_thread.join(timeout=5)
             estimation_thread.join(timeout=2)
@@ -572,7 +572,7 @@ def process_audio():
         stop_threads.set()
         try:
             os.close(master_fd)
-        except:
+        except OSError:
             pass
         output_thread.join(timeout=10)
         estimation_thread.join(timeout=2)

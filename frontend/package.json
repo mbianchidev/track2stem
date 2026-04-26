@@ -39,11 +39,12 @@
   "overrides": {
     "jsonpath": ">=1.2.1",
     "nth-check": ">=2.0.1",
-    "postcss": ">=8.4.31",
-    "webpack-dev-server": "^4.15.2",
+    "postcss": ">=8.5.10",
+    "webpack-dev-server": ">=5.2.1",
     "typescript": "~4.9.5",
     "serialize-javascript": ">=7.0.5",
     "underscore": ">=1.13.8",
-    "@tootallnate/once": ">=3.0.1"
+    "@tootallnate/once": ">=3.0.1",
+    "uuid": ">=14.0.0"
   }
 }
