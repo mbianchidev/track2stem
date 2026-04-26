@@ -121,7 +121,7 @@ jobs:
         run: docker compose build
 
       - name: Start containers and wait for healthy status
-        run: docker compose up -d --wait --wait-timeout 120
+        run: docker compose up -d --wait --wait-timeout 300
 
       - name: Verify container health
         run: docker compose ps
