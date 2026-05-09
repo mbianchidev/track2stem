@@ -14,19 +14,21 @@ import shutil
 # Validation pattern for job IDs: alphanumeric characters and hyphens only (up to 255 characters)
 JOB_ID_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}$')
 ALLOWED_OUTPUT_FORMATS = {'mp3', 'wav', 'flac'}
-# Canonical mapping for demucs model CLI argument values (defense-in-depth for subprocess args)
-DEMUCS_MODEL_ARG_MAP = {m: m for m in ALLOWED_DEMUCS_MODELS}
-# Allowlisted Demucs models accepted from user input
-ALLOWED_DEMUCS_MODELS = {
-    'htdemucs',
-    'htdemucs_ft',
-    'htdemucs_6s',
-    'hdemucs_mmi',
-    'mdx',
-    'mdx_extra',
-    'mdx_q',
-    'mdx_extra_q',
+# Canonical mapping for demucs model CLI argument values (defense-in-depth for subprocess args).
+# Keys are accepted request values; values are the exact, hard-coded CLI literals passed to demucs.
+# This is the single source of truth for both validation and canonicalization.
+DEMUCS_MODEL_ARG_MAP = {
+    'htdemucs': 'htdemucs',
+    'htdemucs_ft': 'htdemucs_ft',
+    'htdemucs_6s': 'htdemucs_6s',
+    'hdemucs_mmi': 'hdemucs_mmi',
+    'mdx': 'mdx',
+    'mdx_extra': 'mdx_extra',
+    'mdx_q': 'mdx_q',
+    'mdx_extra_q': 'mdx_extra_q',
 }
+# Allowlisted Demucs models accepted from user input (derived from the canonical map)
+ALLOWED_DEMUCS_MODELS = frozenset(DEMUCS_MODEL_ARG_MAP.keys())
 ALLOWED_STEM_MODES = {'all', 'isolate'}
 ALLOWED_STEMS = {'vocals', 'drums', 'bass', 'guitar', 'piano', 'other'}
 ALLOWED_MODELS = {
@@ -335,7 +337,7 @@ def process_audio():
         logger.info(f"Output directory created: {job_output_dir}")
         
         # Run Demucs separation
-        processing_status[job_id] = {'status': 'processing', 'progress': 15, 'stage': f'Loading AI model ({model})'}
+        processing_status[job_id] = {'status': 'processing', 'progress': 15, 'stage': f'Loading AI model ({safe_model})'}
         expected_stems = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'] if model in SIX_STEM_MODELS else ['vocals', 'drums', 'bass', 'other']
         logger.info(f"Starting Demucs separation: file='{original_filename}', model={safe_model}, segment={segment_str}, stems=[{', '.join(expected_stems)}]")
         
