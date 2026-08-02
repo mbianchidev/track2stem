@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import logging
 import traceback
@@ -67,7 +68,8 @@ def safe_join(base_dir, *paths):
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
 
