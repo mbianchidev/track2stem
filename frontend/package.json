@@ -39,12 +39,16 @@
   "overrides": {
     "jsonpath": ">=1.2.1",
     "nth-check": ">=2.0.1",
-    "postcss": ">=8.5.10",
-    "webpack-dev-server": ">=5.2.1",
+    "postcss": "8.5.26",
+    "webpack-dev-server": "5.2.6",
     "typescript": "~4.9.5",
     "serialize-javascript": ">=7.0.5",
     "underscore": ">=1.13.8",
     "@tootallnate/once": ">=3.0.1",
-    "uuid": ">=14.0.0"
+    "uuid": ">=14.0.0",
+    "@svgr/webpack": "6.5.1",
+    "svgo": "2.8.3",
+    "qs": "6.15.3",
+    "http-proxy-middleware": "2.0.10"
   }
 }
