@@ -1,13 +1,14 @@
 // Jest-DOM adds custom jest matchers for asserting on DOM nodes.
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
 // Mock Web Audio API for tests
-window.AudioContext = jest.fn().mockImplementation(() => ({
-  decodeAudioData: jest.fn().mockResolvedValue({
-    getChannelData: jest.fn().mockReturnValue(new Float32Array(1000)),
+window.AudioContext = vi.fn().mockImplementation(() => ({
+  decodeAudioData: vi.fn().mockResolvedValue({
+    getChannelData: vi.fn().mockReturnValue(new Float32Array(1000)),
   }),
-  close: jest.fn(),
+  close: vi.fn(),
 }));
 
 window.webkitAudioContext = window.AudioContext;

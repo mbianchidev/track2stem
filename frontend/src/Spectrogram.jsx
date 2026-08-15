@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 
 const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
   const canvasRef = useRef(null);

@@ -3,7 +3,7 @@ node_modules/
 backend/vendor/
 
 # Build outputs
-frontend/build/
+frontend/dist/
 backend/main
 backend/backend
 
@@ -47,4 +47,3 @@ __pycache__/
 *.so
 .Python
 .pytest_cache/
-

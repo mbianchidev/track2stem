@@ -1,26 +1,29 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import App from './App';
+import { vi } from 'vitest';
+import App from './App.jsx';
 
 // Mock axios
-jest.mock('axios', () => ({
-  get: jest.fn(() => Promise.resolve({ data: [] })),
-  post: jest.fn(() => Promise.resolve({ data: { id: 'test-job-id', status: 'pending', filename: 'test.mp3' } })),
-  delete: jest.fn(() => Promise.resolve({ data: { status: 'deleted' } })),
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(() => Promise.resolve({ data: [] })),
+    post: vi.fn(() => Promise.resolve({ data: { id: 'test-job-id', status: 'pending', filename: 'test.mp3' } })),
+    delete: vi.fn(() => Promise.resolve({ data: { status: 'deleted' } })),
+  },
 }));
 
 // Mock localStorage
 const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
 };
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 describe('App', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
   });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import Spectrogram from './Spectrogram';
+import Spectrogram from './Spectrogram.jsx';
 
 describe('Spectrogram', () => {
   test('renders with title', () => {

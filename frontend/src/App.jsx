@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
-import Spectrogram from './Spectrogram';
+import Spectrogram from './Spectrogram.jsx';
 
 // LocalStorage keys
 const STORAGE_KEYS = {
@@ -37,7 +37,7 @@ function App() {
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
 
-  const API_BASE = process.env.REACT_APP_API_URL || '/api';
+  const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
   // Models that produce 6 stems (guitar + piano)
   const SIX_STEM_MODELS = ['htdemucs_6s'];
