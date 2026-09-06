@@ -252,14 +252,13 @@ Normal behavior—Demucs downloads ~2GB of models on first run.
 
 ## Roadmap
 
-- [ ] PostgreSQL/Redis for job persistence
+- [ ] PostgreSQL + Valkey for job persistence
 - [ ] User authentication (JWT)
 - [ ] Job queue with workers (RabbitMQ)
 - [ ] Rate limiting
 - [ ] File expiration and cleanup
-- [ ] Metrics (Prometheus/Grafana)
-- [ ] Object storage (S3/MinIO)
-- [ ] Desktop app (Tauri)
+- [ ] Metrics (OTEL/Prometheus/Grafana)
+- [ ] Object storage (Seaweedfs)
 
 ## References
 
