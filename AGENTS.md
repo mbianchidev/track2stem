@@ -1,101 +1,59 @@
-# Track2stem Development Guidelines
+# Track2stem development guidelines
 
-## Project Overview
-Track2stem is a web application that separates audio tracks into individual stems (vocals, drums, bass, guitar, piano, other) using the Demucs AI model.
+Read the [development guide](docs/development.md) for architecture, toolchains, native-development constraints, and test scope. User-facing behavior and configuration are documented in [docs/](docs/README.md).
 
-## Architecture
+## Repository map
 
-### Frontend (React)
-- Located in `frontend/`
-- Built with Vite + React
-- Uses localStorage for job persistence across page refreshes
-- Features:
-  - Audio file upload with format validation
-  - Real-time processing progress with elapsed time
-  - Spectrogram visualization for input and output audio
-  - Stem download functionality
-  - Job history with processing times
+- `frontend/`: React with Vite, browser localStorage metadata, upload settings, progress polling, waveforms, and stem downloads.
+- `backend/`: Go with Gorilla Mux, in-memory job management, uploads, processor requests, and downloads.
+- `processor/`: Python/Flask with Demucs and FFmpeg. The default `htdemucs_6s` model produces vocals, drums, bass, guitar, piano, and other.
+- `scripts/health-check.sh`: Compose service availability check.
 
-### Backend (Go)
-- Located in `backend/`
-- Built with Go + Gorilla Mux
-- Handles file uploads, job management, and proxies to processor
-- Jobs are stored in-memory (lost on restart)
+## Setup and checks
 
-### Processor (Python/Flask)
-- Located in `processor/`
-- Runs Demucs AI model for audio separation
-- Uses htdemucs_6s model for 6-stem separation
-- Supports MP3 (320kbps) and WAV output formats
+Use Node.js 24, Go 1.27.3, and Python 3.13, matching containers and CI.
 
-## Development Setup
+From the repository root:
+
 ```bash
-# Build and run with Docker Compose
-make docker-build
-make docker-run
-
-# Or use dev compose
-docker-compose -f docker-compose.dev.yml up --build
+docker compose config --quiet
+docker compose build --no-cache
+docker compose up -d --wait --wait-timeout 300
+./scripts/health-check.sh
 ```
 
-## Key Features
+From `frontend/`:
 
-### localStorage Persistence
-- Jobs, current job, and timer are persisted in localStorage
-- Timer continues correctly after page refresh
-- Users can manually delete jobs from history
-
-### Spectrogram Visualization
-- Input audio shows spectrogram on file selection
-- Output stems show spectrograms after processing
-- Uses Web Audio API for frequency analysis
-
-### Stem Modes
-1. **All 6 Stems**: Outputs vocals, drums, bass, guitar, piano, other
-2. **Isolate Mode**: Outputs selected stem + combined backing track
-
-## Future Enhancements
-
-### Parallel Processing (TODO)
-For longer audio files (>3 minutes), parallel processing could significantly reduce processing time:
-
-1. Split audio into segments (e.g., 2 minutes each)
-2. Process segments in parallel using ThreadPoolExecutor
-3. Combine processed segments using ffmpeg concat
-
-Implementation considerations:
-- Segment boundaries may cause audio artifacts
-- Need crossfade or overlap-add for smooth transitions
-- Memory usage increases with parallel workers
-- CPU-bound operation limits parallelism benefit without GPU
-
-### Potential Configuration
-```python
-PARALLEL_ENABLED = os.environ.get('PARALLEL_PROCESSING', 'true')
-SEGMENT_DURATION = 120  # seconds
-MAX_PARALLEL_WORKERS = 2
+```bash
+npm ci
+CI=true npm test
+npm run build
 ```
 
-## Environment Variables
+From `backend/`:
 
-### Backend
-- `PORT`: Server port (default: 8080)
-- `PROCESSOR_URL`: Processor service URL
+```bash
+go mod download
+go mod verify
+go build ./...
+go test -race -timeout=5m ./...
+```
 
-### Processor
-- `PORT`: Server port (default: 5000)
-- `FLASK_DEBUG`: Enable debug mode
+For processor validation tests, use the isolated setup and command in the [processor test guide](docs/development.md#processor-tests). Native processor execution requires POSIX pseudo-terminals and shared writable `/app` paths.
 
-## API Endpoints
+## Behavioral invariants
 
-### Backend
-- `POST /api/upload`: Upload audio file for processing
-- `GET /api/jobs`: List all jobs
-- `GET /api/jobs/{id}`: Get job status
-- `GET /api/download/{id}/{stem}`: Download processed stem
-- `GET /api/processing-status/{id}`: Get real-time processing progress
+- Browser localStorage preserves job metadata and timer state after refresh, not server jobs or audio. Backend jobs are lost on restart.
+- The component named `Spectrogram` draws amplitude waveforms through the Web Audio API.
+- All-stems mode produces six stems with `htdemucs_6s` or four with the other supported models. Isolate mode mixes the remaining stems into `instrumental` for vocals, or `backing` otherwise.
+- Output formats are MP3 at 320 kbps, WAV, and FLAC.
+- The supplied processor is CPU-only. Application-level segment splitting and parallel workers remain [future work](docs/roadmap.md#parallel-separation).
 
-### Processor
-- `POST /process`: Process audio file
-- `GET /status/{job_id}`: Get processing status
-- `GET /health`: Health check
+## Change guidelines
+
+- Follow existing components, handlers, validation allowlists, filename sanitization, and safe-path helpers.
+- Preserve type safety where applicable; report errors clearly and clean up owned resources.
+- Use synthetic fixtures only. Never include private audio, credentials, or customer data in tests or screenshots.
+- Run focused checks and update affected docs. Health checks and current processor validation tests do not prove model inference succeeds.
+- Avoid destructive volume cleanup: `make clean` and `docker compose down --volumes` delete stored audio.
+- Respect the existing MIT license and contribution workflow in [CONTRIBUTING.md](CONTRIBUTING.md).

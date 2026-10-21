@@ -15,45 +15,9 @@ Thank you for your interest in contributing to Track2stem! This document provide
 
 ## Development Setup
 
-### Prerequisites
+See the [development guide](docs/development.md) for toolchain versions, local execution, architecture, tests, and builds. The [documentation index](docs/README.md) links usage, configuration, and API references.
 
-- Docker and Docker Compose
-- Go 1.27.3+ (for backend development)
-- Node.js 18+ (for frontend development)
-- Python 3.13.x (for processor development; Python 3.14 is not yet supported due to lameenc)
-
-### Running Locally
-
-```bash
-# Start all services
-make up
-
-# Or with logs
-make dev
-
-# View logs
-make logs
-```
-
-## Project Structure
-
-```
-track2stem/
-├── backend/          # Go backend API
-│   ├── main.go
-│   ├── go.mod
-│   └── Dockerfile
-├── frontend/         # React frontend
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── Dockerfile
-├── processor/        # Python audio processor
-│   ├── app.py
-│   ├── requirements.txt
-│   └── Dockerfile
-└── docker-compose.yml
-```
+Coding agents must read [AGENTS.md](AGENTS.md) before editing. All contributors remain accountable for their work under the [AI policy](README.md#ai-policy).
 
 ## Coding Standards
 
@@ -68,7 +32,7 @@ track2stem/
 ### Frontend (React)
 
 - Use functional components and hooks
-- Follow ESLint configuration
+- Follow the existing component formatting and patterns
 - Use meaningful component and variable names
 - Keep components focused and reusable
 - Add PropTypes or TypeScript types
@@ -83,24 +47,13 @@ track2stem/
 
 ## Testing
 
-### Backend Tests
-
-```bash
-cd backend
-go test ./...
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm test
-```
+Run the relevant [development checks](docs/development.md), matching the [CI workflow](.github/workflows/ci.yml). Use synthetic audio and mock data only.
 
 ### Integration Tests
 
-Before submitting a PR, test the full workflow:
-1. Upload a sample audio file
+For processing changes, test the full workflow before submitting a PR:
+
+1. Upload a generated audio file
 2. Verify processing completes successfully
 3. Download and verify all stems
 4. Check for errors in logs
