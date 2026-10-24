@@ -18,6 +18,8 @@ npm ci
 npm start
 ```
 
+The version-pinned `allowScripts` entry in `frontend/package.json` approves only `fsevents@2.3.3`, Vite's optional macOS file-watching dependency. After reviewing a future version's install scripts, run `npm install-scripts approve fsevents` from `frontend/` to refresh that approval; do not blanket-approve dependency scripts.
+
 Open Vite's printed URL, normally http://localhost:5173. [vite.config.mjs](../frontend/vite.config.mjs) proxies `/api` to `http://localhost:8080`.
 
 From `frontend/`, run:
