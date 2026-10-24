@@ -11,7 +11,7 @@ Read the [development guide](docs/development.md) for architecture, toolchains, 
 
 ## Setup and checks
 
-Use Node.js 24, Go 1.27.3, and Python 3.13, matching containers and CI.
+Use Node.js 26.12.1, Go 1.27.3, and Python 3.14.9, matching containers and CI.
 
 From the repository root:
 

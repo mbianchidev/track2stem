@@ -4,7 +4,11 @@
 
 ## Toolchains
 
-Containers and [CI](../.github/workflows/ci.yml) use Node.js 24, Go 1.27.3, and Python 3.13. Match those versions for native development. The processor also needs FFmpeg and libsndfile, installed in its Dockerfile.
+Containers and [CI](../.github/workflows/ci.yml) use Node.js 26.12.1, Go 1.27.3, and Python 3.14.9. Match those versions for native development. The processor also needs FFmpeg and libsndfile, installed in its Dockerfile.
+
+The frontend already uses stable React and React DOM 19.3.1. Python 3.15 is not yet usable by the processor: stable Torchaudio and TorchCodec wheels currently support CPython through 3.14, and installation for 3.15 fails with no matching distributions. Keep the processor on the maintained 3.14 series until its full audio dependency stack supports a newer interpreter.
+
+The processor Dockerfile installs PyTorch, Torchaudio, and TorchCodec together from PyTorch's CPU wheel index before the remaining requirements. Do not replace TorchCodec with its default PyPI wheel, which can require CUDA libraries. The image build checks dependency consistency and imports the audio stack, failing immediately if CPU-only imports are broken.
 
 Use the [Compose quickstart](../README.md#quickstart) for the full stack. Full native backend/processor execution is not turnkey: both use writable, shared `/app/uploads` and `/app/outputs` paths, and the processor uses POSIX pseudo-terminals. Use Linux containers rather than native Windows Python.
 
@@ -51,7 +55,7 @@ For validation tests only, install the same small dependency set used by CI. Dem
 
 ```bash
 cd processor
-python3.13 -m venv .venv
+python3.14 -m venv .venv
 . .venv/bin/activate
 python -m pip install flask werkzeug pytest
 python -m pytest test_app.py -v
@@ -88,7 +92,7 @@ The component `.dockerignore` files exclude local dependencies, build outputs, a
 |------|----------------|----------------|
 | [frontend/](../frontend/) | React 19, Vite, Nginx | Upload settings, status polling, localStorage history, waveforms, and download controls |
 | [backend/](../backend/) | Go, Gorilla Mux | Job records, multipart uploads, processor requests, and streaming downloads |
-| [processor/](../processor/) | Python 3.13, Flask, Demucs 4.0.1, FFmpeg | Separation subprocesses, progress parsing, cancellation, FLAC conversion, and backing mixes |
+| [processor/](../processor/) | Python 3.14, Flask, Demucs 4.0.1, FFmpeg | Separation subprocesses, progress parsing, cancellation, FLAC conversion, and backing mixes |
 | [scripts/](../scripts/) | Shell | Stack health check |
 | [.github/workflows/](../.github/workflows/) | GitHub Actions | CI and CodeQL |
 
