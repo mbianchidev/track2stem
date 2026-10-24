@@ -112,16 +112,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Validate docker-compose configuration
-        run: docker compose config
+        run: |
+          docker compose config --quiet
+          docker compose build --print > "$RUNNER_TEMP/compose-bake.json"
 
       - name: Build all containers
-        run: docker compose build
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: .
+          files: ${{ runner.temp }}/compose-bake.json
+          load: true
+          pull: true
+          set: |
+            backend.cache-from=type=gha,version=2,scope=ci-backend-${{ runner.os }}-${{ runner.arch }}
+            backend.cache-to=type=gha,version=2,scope=ci-backend-${{ runner.os }}-${{ runner.arch }},mode=max
+            frontend.cache-from=type=gha,version=2,scope=ci-frontend-${{ runner.os }}-${{ runner.arch }}
+            frontend.cache-to=type=gha,version=2,scope=ci-frontend-${{ runner.os }}-${{ runner.arch }},mode=max
+            processor.cache-from=type=gha,version=2,scope=ci-processor-${{ runner.os }}-${{ runner.arch }}
+            processor.cache-to=type=gha,version=2,scope=ci-processor-${{ runner.os }}-${{ runner.arch }},mode=max
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: 'false'
 
       - name: Start containers and wait for healthy status
-        run: docker compose up -d --wait --wait-timeout 300
+        run: docker compose up -d --no-build --wait --wait-timeout 300
 
       - name: Verify container health
         run: docker compose ps
