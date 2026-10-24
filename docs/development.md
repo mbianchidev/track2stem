@@ -6,7 +6,7 @@
 
 Containers and [CI](../.github/workflows/ci.yml) use Node.js 26.12.1, Go 1.27.3, and Python 3.14.9. Match those versions for native development. The processor also needs FFmpeg and libsndfile, installed in its Dockerfile.
 
-The frontend already uses stable React and React DOM 19.3.1. Python 3.15 is not yet usable by the processor: stable Torchaudio and TorchCodec wheels currently support CPython through 3.14, and installation for 3.15 fails with no matching distributions. Keep the processor on the maintained 3.14 series until its full audio dependency stack supports a newer interpreter.
+The frontend already uses stable React and React DOM 19.3.1. Python 3.15 is not yet usable by the processor: stable CPU Torchaudio wheels currently support CPython through 3.14, and installation for 3.15 fails with no matching distribution. Keep the processor on the maintained 3.14 series until its full audio dependency stack supports a newer interpreter.
 
 The processor Dockerfile installs PyTorch, Torchaudio, and TorchCodec together from PyTorch's CPU wheel index before the remaining requirements. Do not replace TorchCodec with its default PyPI wheel, which can require CUDA libraries. The image build checks dependency consistency and imports the audio stack, failing immediately if CPU-only imports are broken.
 
