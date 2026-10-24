@@ -72,6 +72,14 @@ CI builds all images and checks startup health. Those checks do not run real mod
 
 There is no release/publish entrypoint in the current repository. Compose builds local images; do not treat those development images as a published container release.
 
+### CI image caching
+
+CI generates a Buildx Bake definition with `docker compose build --print`, preserving Compose's service settings and image tags. Bake loads all three images into the runner, then `docker compose up --no-build` runs the same startup health checks against those images.
+
+Each service has a separate GitHub Actions v2 layer cache scoped by runner OS and architecture. `mode=max` retains intermediate build stages, including dependency installation. Base images are pulled on every run; missing or evicted caches still build normally. Cache access follows GitHub's existing branch and PR permissions, without additional token permissions. Build-record artifact uploads are disabled to avoid extra storage and transfer overhead.
+
+The component `.dockerignore` files exclude local dependencies, build outputs, and Python test caches from build contexts. CI events, job names, tests, and CodeQL coverage are unchanged. Local container validation should continue using `docker compose build --no-cache` as shown above.
+
 ## Architecture
 
 | Path | Implementation | Responsibility |
