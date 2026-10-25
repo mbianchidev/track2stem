@@ -52,6 +52,7 @@ For processor validation tests, use the isolated setup and command in the [proce
 ## Change guidelines
 
 - Follow existing components, handlers, validation allowlists, filename sanitization, and safe-path helpers.
+- Before upgrading processor Python, complete the [Python upgrade gate](docs/development.md#python-upgrade-gate). Require compatible stable CPU wheels, full installation, and real inference evidence; Flask tests and startup health alone are insufficient.
 - Preserve type safety where applicable; report errors clearly and clean up owned resources.
 - Use synthetic fixtures only. Never include private audio, credentials, or customer data in tests or screenshots.
 - Run focused checks and update affected docs. Health checks and current processor validation tests do not prove model inference succeeds.

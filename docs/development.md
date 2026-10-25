@@ -6,11 +6,46 @@
 
 Containers and [CI](../.github/workflows/ci.yml) use Node.js 26.12.1, Go 1.27.3, and Python 3.14.9. Match those versions for native development. The processor also needs FFmpeg and libsndfile, installed in its Dockerfile.
 
-The frontend already uses stable React and React DOM 19.3.1. Python 3.15 is not yet usable by the processor: stable CPU Torchaudio wheels currently support CPython through 3.14, and installation for 3.15 fails with no matching distribution. Keep the processor on the maintained 3.14 series until its full audio dependency stack supports a newer interpreter.
+The frontend already uses stable React and React DOM 19.3.1. Processor interpreter changes must satisfy the [Python upgrade gate](#python-upgrade-gate); a new stable Python release alone is not sufficient.
 
 The processor Dockerfile installs PyTorch, Torchaudio, and TorchCodec together from PyTorch's CPU wheel index before the remaining requirements. Do not replace TorchCodec with its default PyPI wheel, which can require CUDA libraries. The image build checks dependency consistency and imports the audio stack, failing immediately if CPU-only imports are broken.
 
 Use the [Compose quickstart](../README.md#quickstart) for the full stack. Full native backend/processor execution is not turnkey: both use writable, shared `/app/uploads` and `/app/outputs` paths, and the processor uses POSIX pseudo-terminals. Use Linux containers rather than native Windows Python.
+
+## Python upgrade gate
+
+### Why Python 3.15.1 is blocked
+
+As checked on **2026-10-25**, Python 3.15.1 is stable, but stable **Torchaudio 2.11.0** has no compatible CPython 3.15 wheels in the [PyTorch CPU index](https://download.pytorch.org/whl/cpu/torchaudio/) for Linux amd64 or arm64. Its available wheels stop at CPython 3.14. The processor requires Torchaudio through Demucs; installing PyTorch alone or passing Flask tests cannot replace it.
+
+This is a native wheel/ABI availability constraint, not a Python syntax or Flask compatibility problem. `cp315` is the regular CPython 3.15 ABI, including Python 3.15.1; a `cp314` wheel cannot satisfy it. CPU PyTorch and [CPU TorchCodec](https://download.pytorch.org/whl/cpu/torchcodec/) already have `cp315` wheels, so neither is the current blocker.
+
+Reproduce the Torchaudio wheel-resolution failure without installing packages:
+
+```bash
+python3 -m pip install --dry-run --ignore-installed --no-deps \
+  --only-binary=:all: \
+  --python-version 3.15 --implementation cp --abi cp315 \
+  --platform manylinux_2_28_x86_64 \
+  --target /tmp/track2stem-python315-wheel-check \
+  --index-url https://download.pytorch.org/whl/cpu \
+  torchaudio
+```
+
+Repeat with `--platform manylinux_2_28_aarch64` for arm64. Both probes currently fail with `No matching distribution found for torchaudio`. This command checks only wheel availability, not installation, shared-library loading, or inference; do not use its `--no-deps` option to bypass dependency resolution in a real installation.
+
+The last validated CPU stack is **Python 3.14.9, Demucs 4.0.1, PyTorch 2.14.1+cpu, Torchaudio 2.11.0+cpu, and TorchCodec 0.17.0+cpu**. Full installation and real separation succeeded with that combination. These are dated compatibility results, not a permanent ban on Python 3.15 or a replacement for checking newer mutually compatible releases.
+
+### Requirements before upgrading
+
+Agents and contributors must complete all of the following before advancing the processor's Python version:
+
+1. Recheck the latest stable Python release and stable, mutually compatible PyTorch, Torchaudio, and TorchCodec CPU wheels for the candidate ABI and target Linux architectures. Cover amd64 (CI) and arm64 (Apple Silicon container development). Package `Requires-Python` metadata, a wheel for another ABI, or a macOS-only installation is not proof of Linux container support.
+2. Build the complete [processor image](../processor/Dockerfile) with the candidate interpreter and all [requirements](../processor/requirements.txt), retaining the CPU wheel index for all three audio packages. Require successful dependency resolution, `python -m pip check`, imports of `torch`, `torchaudio`, and `torchcodec`, `torch.version.cuda is None`, and `python -m demucs --help`. FFmpeg, libsndfile, and the codec shared libraries must load without CUDA dependencies. Do not hide installation/import failures or substitute an untested source build or prerelease wheel.
+3. Require the [processor validation tests](#processor-tests), an uncached [Compose build and startup checks](#container-and-integration-checks), and the existing CI checks to pass with the selected runtime. Validation tests and health endpoints deliberately do not load a separation model, so these checks alone do not authorize an upgrade.
+4. Run real `htdemucs_6s` inference on a generated 44.1-kHz stereo WAV fixture. Verify all six WAV stems; FLAC vocals plus instrumental; and 320-kbps MP3 isolation of a non-vocal stem plus backing. Check that each file is non-empty, decode it with FFmpeg, and use FFprobe to confirm the requested codecs/MP3 bitrate, 16-bit PCM WAV output, sample rate, channels, and expected duration. Exercise upload, completed progress, and stem downloads through Nginx -> Go -> Python. Preserve CPU-only execution, six/four-stem model behavior, and all existing output formats.
+5. Update the Python selection in [Docker](../processor/Dockerfile), [CI](../.github/workflows/ci.yml), this guide, and [AGENTS.md](../AGENTS.md) together; change coupled dependency constraints only when needed for proven compatibility. Record exact interpreter/dependency versions, architectures, commands, results, and any remaining upstream warnings in the PR. Keep the blocker explanation dated and revise it when wheel availability changes.
+6. If stable CPU wheels, full installation, imports, or real inference fail, retain the latest maintained patch of the last proven-compatible Python series and document the specific failure. Do not remove Demucs/Torchaudio/TorchCodec, drop audio features, add CUDA, or redesign the ML architecture just to claim a newer interpreter version.
 
 ## Frontend development
 
