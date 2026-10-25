@@ -11,7 +11,7 @@ Read the [development guide](docs/development.md) for architecture, toolchains, 
 
 ## Setup and checks
 
-Use Node.js 24, Go 1.27.3, and Python 3.13, matching containers and CI.
+Use Node.js 26.12.1, Go 1.27.3, and Python 3.14.9, matching containers and CI.
 
 From the repository root:
 
@@ -52,6 +52,7 @@ For processor validation tests, use the isolated setup and command in the [proce
 ## Change guidelines
 
 - Follow existing components, handlers, validation allowlists, filename sanitization, and safe-path helpers.
+- Before upgrading processor Python, complete the [Python upgrade gate](docs/development.md#python-upgrade-gate). Require compatible stable CPU wheels, full installation, and real inference evidence; Flask tests and startup health alone are insufficient.
 - Preserve type safety where applicable; report errors clearly and clean up owned resources.
 - Use synthetic fixtures only. Never include private audio, credentials, or customer data in tests or screenshots.
 - Run focused checks and update affected docs. Health checks and current processor validation tests do not prove model inference succeeds.
