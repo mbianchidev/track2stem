@@ -5,10 +5,12 @@
 ## Separate a track
 
 1. Start the stack using the [quickstart](../README.md#quickstart) and open http://localhost:3000.
-2. Select audio with the file picker. Supported extensions are MP3, WAV, FLAC, OGG, M4A, and AAC. Keep uploads below 100 MiB to leave room for multipart overhead at the web proxy.
-3. Choose **All 6 Stems / All 4 Stems** or **Isolate One**, then select the format and model.
-4. Click **Upload & Process** and watch the status and elapsed time.
-5. When completed, download each stem from the current job or **Recent Jobs**.
+2. Click **Choose audio file** in **Source audio**. Supported extensions are MP3, WAV, FLAC, OGG, M4A, and AAC. Keep uploads below 100 MiB to leave room for multipart overhead at the web proxy.
+3. In **Separation settings**, choose **All 6 stems / All 4 stems** or **Isolate one**, then select the model and output format.
+4. Click **Upload & Process**. **Separated stems** shows the current job, processing stage, progress, and elapsed time.
+5. When completed, click **Download** beside each stem's waveform, or use the download controls in **Recent jobs**.
+
+On desktop, the source and output lanes sit beside the settings panel. On narrow screens, the same controls stack in workflow order. To replace a selected source, click **Choose audio file** again.
 
 Output filenames include the sanitized original track name and stem, such as `song_t2s_vocals.mp3`.
 
@@ -19,7 +21,7 @@ Output filenames include the sanitized original track name and stem, such as `so
 | `htdemucs_6s` (default) | Vocals, drums, bass, guitar, piano, other |
 | `htdemucs`, `htdemucs_ft`, `hdemucs_mmi`, `mdx`, `mdx_extra`, `mdx_q`, `mdx_extra_q` | Vocals, drums, bass, other |
 
-Guitar and piano isolation require `htdemucs_6s`. In isolate mode, vocals produce `vocals` and `instrumental`; another instrument produces that stem and `backing`.
+Guitar and piano isolation require `htdemucs_6s`. Switching to a four-stem model while either is selected resets isolation to vocals and displays an explanation. In isolate mode, vocals produce `vocals` and `instrumental`; another instrument produces that stem and `backing`.
 
 Isolate mode still separates the full track before FFmpeg mixes the remaining stems. It is not a faster two-stem inference path. The API also accepts `other` as an isolated stem, though the browser's selector does not offer it.
 
@@ -33,7 +35,7 @@ Isolate mode still separates the full track before FFmpeg mixes the remaining st
 
 ## Advanced tuning
 
-The **Advanced Tuning** panel exposes these options. The processor validates the listed values, but Demucs may reject settings that are incompatible with the chosen model.
+The **Advanced tuning** control expands these options inside **Separation settings**. The processor validates the listed values, but Demucs may reject settings that are incompatible with the chosen model.
 
 | Setting | Browser default | Accepted values |
 |---------|-----------------|-----------------|
@@ -44,14 +46,14 @@ The **Advanced Tuning** panel exposes these options. The processor validates the
 
 Leave segment size at **Default** initially. Larger overlap, additional shifts, and fine-tuned models can increase processing time.
 
-The processor adds Demucs's `--shifts` argument only for positive values; `0` leaves the upstream CLI default in effect. Do not treat the browser's "off" label as a guarantee that Demucs shift augmentation is disabled.
+The processor adds Demucs's `--shifts` argument only for positive values; `0`, labeled **Upstream default**, leaves the upstream CLI default in effect. It does not guarantee that Demucs shift augmentation is disabled.
 
 ## Progress, previews, and history
 
 The browser polls job status and processor progress every two seconds. Progress combines parsed Demucs output and time-based estimation, so it is not an accurate remaining-time forecast.
 
-The component named `Spectrogram` draws amplitude waveforms, not frequency spectrograms. Browser audio decoding support determines which formats can be previewed; a failed waveform does not necessarily mean the processor cannot read the file.
+The component named `Spectrogram` draws amplitude waveforms, not frequency spectrograms. Browser audio decoding support determines which formats can be previewed; a failed waveform does not necessarily mean the processor cannot read the file. Waveform errors do not remove the download controls.
 
 Recent-job metadata, the current job, and its timer are saved in browser localStorage for refresh recovery. The backend job map is separate and only lives in memory. See [data lifecycle](configuration.md#limitations-and-data-lifecycle) before restarting services or relying on old downloads.
 
-The API supports cancellation through job deletion. This is [best-effort](configuration.md#limitations-and-data-lifecycle), not a guarantee that all processing stages stop immediately.
+**Recent jobs** shows up to ten entries. **Clear** dismisses a completed or failed current job without removing its history entry. **Remove from history** removes the browser metadata; it does not delete stored audio. For an active history entry, removal also requests cancellation through job deletion. This is [best-effort](configuration.md#limitations-and-data-lifecycle), not a guarantee that all processing stages stop immediately.

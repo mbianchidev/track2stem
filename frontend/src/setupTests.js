@@ -8,7 +8,7 @@ window.AudioContext = vi.fn().mockImplementation(() => ({
   decodeAudioData: vi.fn().mockResolvedValue({
     getChannelData: vi.fn().mockReturnValue(new Float32Array(1000)),
   }),
-  close: vi.fn(),
+  close: vi.fn().mockResolvedValue(undefined),
 }));
 
 window.webkitAudioContext = window.AudioContext;
