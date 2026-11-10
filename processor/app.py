@@ -116,7 +116,7 @@ def execute(job_id, settings, prepare_source):
         return error_response(str(error), 400)
     except FileExistsError:
         return error_response("This job already has output; submit a new job ID", 409)
-    except (OSError, RuntimeError, TimeoutError) as error:
+    except (OSError, RuntimeError, TimeoutError, ImportError) as error:
         logger.exception("Processing failed for %s", job_id)
         with process_lock:
             processing_status[job_id] = {"status": "failed", "progress": 0, "stage": "Processing failed"}

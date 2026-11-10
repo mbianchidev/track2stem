@@ -14,6 +14,31 @@ import (
 	"time"
 )
 
+func TestCrossOriginPreflightAllowsUploadAndMix(t *testing.T) {
+	t.Setenv("ALLOWED_ORIGINS", "http://127.0.0.1:20173")
+	api := httptest.NewServer(newRouter())
+	defer api.Close()
+	for _, path := range []string{"/api/upload", "/api/import", "/api/jobs/synthetic/mix"} {
+		request, err := http.NewRequest(http.MethodOptions, api.URL+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("Origin", "http://127.0.0.1:20173")
+		request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+		request.Header.Set("Access-Control-Request-Headers", "content-type")
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusOK ||
+			response.Header.Get("Access-Control-Allow-Origin") != "http://127.0.0.1:20173" ||
+			!strings.Contains(response.Header.Get("Access-Control-Allow-Methods"), "POST") {
+			t.Fatalf("preflight %s failed: %d %v", path, response.StatusCode, response.Header)
+		}
+	}
+}
+
 func TestUploadMixAndArtifactWorkflow(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("UPLOAD_FOLDER", filepath.Join(root, "uploads"))

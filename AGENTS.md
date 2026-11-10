@@ -7,6 +7,7 @@ Read the [development guide](docs/development.md) for architecture, toolchains, 
 - `frontend/`: React with Vite, browser localStorage metadata, upload settings, progress polling, waveforms, and stem downloads.
 - `backend/`: Go with Gorilla Mux, in-memory job management, uploads, processor requests, and downloads.
 - `processor/`: Flask adapter and `track2stem_engine/`, shared local CPU processing with Demucs, FFmpeg and optional practice models. The default `htdemucs_6s` model produces vocals, drums, bass, guitar, piano, and other.
+- `plugin/`: Apple Silicon VST3/AUv2 wrappers, shared React WebView, independent bundled-worker builds and per-user installation.
 - `scripts/health-check.sh`: Compose service availability check.
 
 ## Setup and checks

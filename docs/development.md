@@ -72,6 +72,29 @@ The build writes `frontend/dist/`. There is no separate lint script in the curre
 
 Frontend tests use mocked API responses and synthetic audio only. `App.test.jsx` covers upload options, validation, job states, persistence, progress, and history actions; `Spectrogram.test.jsx` covers waveform source changes, responsive canvas sizing, decoding failures, and audio-context cleanup.
 
+The UI fonts are bundled locally through Fontsource. Builds retain their original OFL notices under `font-licenses/`; rendering does not contact Google Fonts.
+
+### Real browser integration
+
+Install the frontend dependencies and Chromium, and provide a Python environment containing the full processor requirements:
+
+```bash
+cd frontend
+npm ci
+npx playwright install chromium
+TRACK2STEM_TEST_PYTHON=/absolute/path/to/processor-venv/bin/python npm run test:e2e
+```
+
+By default, Playwright starts owned Flask/Go/Vite processes on loopback ports 20500, 20080 and 20173 and stops them afterward. Set `TRACK2STEM_TEST_MODELS` to an existing model cache to avoid repeated downloads. Tests generate their own audio and verify actual separation, PCM16 WAV/FLAC/320-kbps MP3 downloads, backing-instrument levels, boosted remix output, browser refresh, and rejected remote URLs.
+
+For an already-running Compose stack, use `TRACK2STEM_TEST_URL=http://127.0.0.1:3000 npm run test:e2e`. CI runs this path through Nginx after building and starting all services. FFprobe must be available to inspect downloads. Native builds have a [separate worker/editor workflow](native-plugin.md#build-independently-of-the-web-stack).
+
+### CPU measurements
+
+One Apple Silicon check on generated 20-second stereo audio, Python 3.14.10 and CPU PyTorch 2.15.0 measured warm inference at 4.29 s for six-stem defaults with one worker, 2.99 s with two workers, and 1.90 s for the Hybrid v3 fast profile. Parallel reconstruction's maximum absolute difference was zero for this fixture.
+
+These are individual synthetic measurements, not song-quality scores, physical deadline qualification, or general speed guarantees. The default model stays six-stem; the faster four-stem profile deliberately trades model/overlap characteristics for CPU time.
+
 ## Backend checks
 
 From the repository root, with the matching Go toolchain:
@@ -111,7 +134,7 @@ docker compose up -d --wait --wait-timeout 300
 ./scripts/health-check.sh
 ```
 
-CI builds all images and checks startup health. Those checks do not run real model inference. For processing changes, use generated audio or a synthetic fixture, verify separation completes, download the expected stems, and inspect logs and audio before opening a PR. Never use private or customer data in tests, logs, screenshots, or examples.
+CI builds all images, checks startup health, and runs the real browser separation suite through Nginx. Health checks alone do not prove model inference. For processing changes, use generated audio or a synthetic fixture, verify separation completes, download the expected stems, and inspect logs and audio before opening a PR. Never use private or customer data in tests, logs, screenshots, or examples.
 
 There is no release/publish entrypoint in the current repository. Compose builds local images; do not treat those development images as a published container release.
 
@@ -121,7 +144,7 @@ CI generates a Buildx Bake definition with `docker compose build --print`, prese
 
 Each service has a separate GitHub Actions v2 layer cache scoped by runner OS and architecture. `mode=max` retains intermediate build stages, including dependency installation. Base images are pulled on every run; missing or evicted caches still build normally. Cache access follows GitHub's existing branch and PR permissions, without additional token permissions. Build-record artifact uploads are disabled to avoid extra storage and transfer overhead.
 
-The component `.dockerignore` files exclude local dependencies, build outputs, and Python test caches from build contexts. CI events, job names, tests, and CodeQL coverage are unchanged. Local container validation should continue using `docker compose build --no-cache` as shown above.
+The component `.dockerignore` files exclude local dependencies, build outputs, and Python test caches from build contexts. Existing web job names and CodeQL coverage are unchanged. The separate path-filtered native workflow builds the packaged runtime, exercises its real worker/editor on macOS, and verifies ZIP installation in an isolated home. Artifact upload requires an explicit manual run. Local container validation should continue using `docker compose build --no-cache` as shown above.
 
 ## Architecture
 
@@ -130,6 +153,7 @@ The component `.dockerignore` files exclude local dependencies, build outputs, a
 | [frontend/](../frontend/) | React 19, Vite, Nginx | Upload settings, status polling, localStorage history, waveforms, and download controls |
 | [backend/](../backend/) | Go, Gorilla Mux | Job records, multipart uploads, processor requests, and streaming downloads |
 | [processor/](../processor/) | Python 3.14, Flask adapter, shared headless engine, Demucs 4.0.1, FFmpeg | Cached CPU inference, overlap-add workers, progress/cancellation, mixes, analysis and transcription |
+| [plugin/](../plugin/) | iPlug2, VST3/AUv2, native WebView, bundled Python worker | Offline DAW import/export, process isolation, project-state adapter, independent build/package |
 | [scripts/](../scripts/) | Shell | Stack health check |
 | [.github/workflows/](../.github/workflows/) | GitHub Actions | CI and CodeQL |
 
@@ -143,6 +167,6 @@ Nginx serves the production frontend and proxies `/api` to the backend. Vite use
 
 ## Documentation screenshot
 
-[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows the graphite-and-orange interface, a generated WAV selected in **Source audio**, its browser-rendered waveform, and the adjacent **Separation settings** panel. The jobs-list response was mocked as empty to isolate the UI capture from backend state; no upload or model inference was performed.
+[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows a generated WAV, its source waveform, six actual Demucs outputs, instrument controls, real analysis/notation exports and recent-job metadata. The browser test uploads and processes the generated fixture through Go and Flask; no completed jobs or separation results are fabricated.
 
-To refresh it, run the frontend locally, use a fresh browser context at a 1440 px desktop width, select generated audio with a neutral filename, wait for the waveform, fonts, and control transitions to finish rendering, and capture the full unmodified interface. Do not use personal audio, production jobs, or fabricated completed-job results.
+To refresh it, set `TRACK2STEM_CAPTURE_README=1` when running the browser integration suite. It uses a fresh 1440 px context, reselects the same generated source after actual processing, waits for waveforms/fonts, and captures the full unmodified interface. Do not use personal audio or production jobs.

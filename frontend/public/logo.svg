@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-labelledby="title">
+  <title id="title">Track2stem: one audio signal branching into separate stems</title>
+  <rect width="360" height="80" rx="16" fill="#15171a"/>
+  <g transform="translate(8 8)">
+    <rect x="2" y="2" width="60" height="60" rx="14" fill="#f28c38"/>
+    <g fill="none" stroke="#15171a" stroke-width="3.5" stroke-linecap="round">
+      <path d="M12 29v6m7-12v18"/>
+      <path d="M25 32h7c8 0 8-16 16-16h3M25 32h26M25 32h7c8 0 8 16 16 16h3"/>
+    </g>
+    <g fill="#15171a">
+      <circle cx="51" cy="16" r="3.5"/>
+      <circle cx="51" cy="32" r="3.5"/>
+      <circle cx="51" cy="48" r="3.5"/>
+    </g>
+  </g>
+  <text x="88" y="54" fill="#f4f5f7" font-family="'Arial Narrow',Arial,sans-serif" font-size="40" font-weight="700" letter-spacing="-1.5">Track<tspan fill="#f28c38">2</tspan>stem</text>
+</svg>

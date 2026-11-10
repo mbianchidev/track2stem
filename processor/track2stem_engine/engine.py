@@ -6,6 +6,7 @@ import shutil
 import threading
 import time
 import uuid
+import datetime
 from pathlib import Path
 
 import numpy as np
@@ -41,6 +42,8 @@ class Engine:
         return Path(safe_join(self.output_dir, job_id))
 
     def run(self, source, job_id, settings, report=None, cancelled=None):
+        settings = Settings.from_mapping(settings.to_dict())
+        created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         source = Path(source).resolve()
         if not source.is_file() or source.suffix.lower().lstrip(".") not in ALLOWED_EXTENSIONS:
             raise ValueError("Select an existing, supported audio file")
@@ -74,6 +77,7 @@ class Engine:
                 sf.write(raw_dir / f"{name}.wav", audio, sample_rate, subtype="FLOAT")
             manifest = {
                 "version": CONTRACT_VERSION, "job_id": job_id, "status": "completed",
+                "created_at": created_at,
                 "filename": source.name.removeprefix(f"{job_id}_"), "settings": settings.to_dict(),
                 "mix_stems": list(settings.mix_stems), "gains": dict.fromkeys(settings.mix_stems, 1.0),
                 "stem_files": {name: str(raw_dir / f"{name}.wav") for name in settings.mix_stems},
@@ -145,7 +149,7 @@ class Engine:
         sources = {}
         sample_rate = None
         for stem in manifest["mix_stems"]:
-            sources[stem], rate = sf.read(job_dir / ".stems" / f"{stem}.wav", dtype="float32", always_2d=True)
+            sources[stem], rate = sf.read(safe_join(job_dir / ".stems", f"{stem}.wav"), dtype="float32", always_2d=True)
             if sample_rate is not None and rate != sample_rate:
                 raise RuntimeError("Stored stems have incompatible sample rates")
             sample_rate = rate
@@ -197,12 +201,8 @@ class Engine:
             manifest = self.load(job_id)
             manifest["gains"] = validate_gains(gains, manifest["mix_stems"])
             job_dir = self._job_dir(job_id)
-            previous = manifest["outputs"]
             manifest["outputs"] = self._render(job_dir, manifest, cancelled)
             self._save_manifest(job_dir, manifest)
-            for directory in {Path(path).parent for path in previous.values()}:
-                if directory.parent == job_dir and directory.name.startswith("render-"):
-                    shutil.rmtree(directory)
             return manifest
         finally:
             self._lock.release()

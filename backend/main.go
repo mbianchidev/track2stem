@@ -120,11 +120,8 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
-func newRouter() *mux.Router {
+func newRouter() http.Handler {
 	router := mux.NewRouter()
-
-	// CORS middleware
-	router.Use(corsMiddleware)
 
 	// Routes
 	router.HandleFunc("/api/health", healthHandler).Methods("GET")
@@ -138,7 +135,7 @@ func newRouter() *mux.Router {
 	router.HandleFunc("/api/artifacts/{id}/{asset}", artifactHandler).Methods("GET")
 	router.HandleFunc("/api/stems/{id}/{asset}", stemHandler).Methods("GET")
 	router.HandleFunc("/api/import", importHandler).Methods("POST")
-	return router
+	return corsMiddleware(router)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

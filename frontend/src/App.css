@@ -1113,6 +1113,16 @@ progress::-moz-progress-bar {
   border: 0;
 }
 
+.native-startup {
+  padding: 40px;
+}
+
+.native-notice {
+  margin: 20px 24px;
+  color: var(--color-success);
+  font-size: 12px;
+}
+
 .source-type label,
 .practice-options label {
   display: flex;

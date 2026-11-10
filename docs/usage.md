@@ -25,7 +25,7 @@ Guitar and piano isolation require `htdemucs_6s`. Switching to a four-stem model
 
 Isolate mode still separates the full track before mixing the remaining stems. It is not a faster two-stem inference path. The API also accepts `other` as an isolated stem, though the browser's selector does not offer it.
 
-The **Fast / four stems** CPU profile selects `htdemucs`, disables shift passes, and reduces overlap to `0.1`. It sacrifices separate guitar/piano outputs and some boundary overlap. **Six-stem defaults** restores the default model and overlap. Neither profile is a processing-time guarantee.
+The **Fast / four stems** CPU profile selects the convolutional Hybrid v3 model `hdemucs_mmi`, disables shift passes, and reduces overlap to `0.1`. It sacrifices separate guitar/piano outputs and some boundary overlap; separation quality differs from the Transformer models. **Six-stem defaults** restores the default model and overlap. Neither profile is a processing-time guarantee.
 
 ## Instrument levels
 

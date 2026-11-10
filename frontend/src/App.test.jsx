@@ -59,6 +59,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     savedState.clear();
+    localStorageMock.setItem.mockImplementation((key, value) => savedState.set(key, String(value)));
     axios.get.mockReset().mockResolvedValue({ data: [] });
     axios.post.mockReset().mockResolvedValue({ data: makeJob() });
     axios.delete.mockReset().mockResolvedValue({ data: { status: 'deleted' } });
@@ -322,6 +323,19 @@ describe('App', () => {
     expect(within(screen.getByRole('region', { name: 'Recent jobs' })).getByText('synthetic-demo.wav')).toBeInTheDocument();
   });
 
+  test('keeps downloads usable when browser or DAW metadata storage is full', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({
+      status: 'completed', output_files: { vocals: '/synthetic/vocals.wav' },
+    })));
+    vi.spyOn(localStorageMock, 'setItem').mockImplementation(() => {
+      throw new DOMException('Synthetic storage limit', 'QuotaExceededError');
+    });
+    await renderApp();
+    expect(screen.getByRole('alert')).toHaveTextContent(/metadata could not be saved/i);
+    expect(screen.getByRole('button', { name: 'Download vocals', exact: true })).toBeEnabled();
+  });
+
   test.each(['status', 'progress'])('reports a transient %s failure and recovers on the next poll', async (endpoint) => {
     vi.useFakeTimers();
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -363,6 +377,44 @@ describe('App', () => {
       expect(formData.get(name)).toBe('true');
     }
     expect(formData.get('workers')).toBe('2');
+  });
+
+  test('cancels the current running job without requiring a history entry', async () => {
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({ status: 'processing' })));
+    await renderApp();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    expect(axios.delete).toHaveBeenCalledWith('/api/jobs/synthetic-job');
+    expect(screen.getByText('No stems yet')).toBeInTheDocument();
+    expect(savedState.has('track2stem_current_job')).toBe(false);
+  });
+
+  test('does not restore a cancelled job when an older status request finishes late', async () => {
+    vi.useFakeTimers();
+    const job = makeJob({ status: 'processing' });
+    savedState.set('track2stem_current_job', JSON.stringify(job));
+    let finishStatus;
+    axios.get.mockImplementation((url) => {
+      if (url === '/api/jobs') return Promise.resolve({ data: [] });
+      if (url.includes('processing-status')) return Promise.resolve({ data: { progress: 10 } });
+      return new Promise((resolve) => { finishStatus = resolve; });
+    });
+    await renderApp();
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    await act(async () => finishStatus({ data: job }));
+    expect(screen.getByText('No stems yet')).toBeInTheDocument();
+    expect(savedState.has('track2stem_current_job')).toBe(false);
+  });
+
+  test('retains the current job when cancellation fails so it can be retried', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    axios.delete.mockRejectedValue(new Error('Synthetic connection failure'));
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({ status: 'processing' })));
+    await renderApp();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not cancel this job');
+    expect(screen.getByRole('button', { name: 'Cancel job' })).toBeEnabled();
+    expect(savedState.has('track2stem_current_job')).toBe(true);
   });
 
   test('imports a YouTube video without requiring a local file', async () => {

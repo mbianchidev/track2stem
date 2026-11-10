@@ -18,6 +18,16 @@ def test_settings_preserve_defaults_and_reject_incompatible_transcription():
         Settings.from_mapping({"model": "htdemucs", "guitar_tabs": "true"})
 
 
+def test_headless_engine_rejects_unvalidated_settings_before_creating_output(tmp_path):
+    source = tmp_path / "synthetic.wav"
+    sf.write(source, np.full((4410, 2), .01), 44100)
+    engine = Engine(tmp_path / "outputs", tmp_path / "models",
+                    separator=lambda *_args: ({stem: np.full((4410, 2), .01) for stem in Settings().stems}, 44100))
+    with pytest.raises(ValueError, match="Invalid model"):
+        engine.run(source, "synthetic-invalid", Settings(model="unknown"))
+    assert not (tmp_path / "outputs" / "synthetic-invalid").exists()
+
+
 def test_isolated_backing_can_remix_each_original_instrument(tmp_path):
     source = tmp_path / "synthetic.wav"
     sf.write(source, np.zeros((4410, 2)), 44100)

@@ -1,0 +1,92 @@
+name: Native plugin
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugin/**'
+      - 'processor/**'
+      - 'frontend/**'
+      - '.github/workflows/native-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-plugin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: Apple Silicon VST3 and AU
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.12.1'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14.9'
+          cache: pip
+          cache-dependency-path: |
+            processor/requirements.txt
+            plugin/requirements-build.txt
+
+      - name: Build self-contained CPU runtime
+        run: python plugin/build-runtime.py
+
+      - name: Build shared UI
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build -- --base=./ --outDir ../plugin/build/web --emptyOutDir
+
+      - name: Build native targets and workflow probe
+        run: |
+          cmake -S plugin -B plugin/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build plugin/build --target Track2stem-vst3 Track2stem-au track2stem-native-smoke --parallel 3
+          codesign --force --sign - plugin/build/out/Track2stem.vst3
+          codesign --force --sign - plugin/build/out/Track2stem.component
+
+      - name: Verify real frozen inference and exports
+        run: |
+          python plugin/tests/check-worker.py \
+            --worker "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+            --models "$RUNNER_TEMP/track2stem-models" \
+            --ui "$PWD/plugin/build/web" \
+            --output "$RUNNER_TEMP/worker-evidence"
+
+      - name: Verify offscreen native editor and lifecycle
+        run: |
+          python plugin/tests/check-worker.py --fixture-only "$RUNNER_TEMP/native-fixture.wav"
+          plugin/build/track2stem-native-smoke \
+            "$PWD/plugin/build/out/Track2stem.component" \
+            "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+            "$RUNNER_TEMP/track2stem-models" \
+            "$RUNNER_TEMP/native-ui-evidence" \
+            "$RUNNER_TEMP/native-fixture.wav"
+
+      - name: Package and verify isolated installation
+        run: |
+          python plugin/package.py
+          python plugin/tests/check-package.py plugin/dist/*.zip
+
+      - name: Retain the manually requested package
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Track2stem-macos-arm64
+          path: |
+            plugin/dist/*.zip
+            plugin/dist/*.zip.sha256
+          if-no-files-found: error

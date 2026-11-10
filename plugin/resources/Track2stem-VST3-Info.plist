@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>Track2stem</string>
+  <key>CFBundleIdentifier</key><string>dev.track2stem.vst3.Track2stem</string>
+  <key>CFBundleName</key><string>Track2stem</string>
+  <key>CFBundlePackageType</key><string>BNDL</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>CFBundleSignature</key><string>T2St</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+</dict></plist>
