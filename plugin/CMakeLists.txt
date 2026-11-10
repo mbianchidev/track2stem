@@ -15,17 +15,20 @@ FetchContent_Declare(iplug2
 )
 FetchContent_MakeAvailable(iplug2)
 find_package(Git REQUIRED)
-set(TRACK2STEM_WEBVIEW_PATCH "${CMAKE_CURRENT_SOURCE_DIR}/patches/webview.patch")
-execute_process(COMMAND "${GIT_EXECUTABLE}" apply --reverse --check "${TRACK2STEM_WEBVIEW_PATCH}"
-  WORKING_DIRECTORY "${iplug2_SOURCE_DIR}" RESULT_VARIABLE TRACK2STEM_PATCH_APPLIED
-  OUTPUT_QUIET ERROR_QUIET)
-if(NOT TRACK2STEM_PATCH_APPLIED EQUAL 0)
-  execute_process(COMMAND "${GIT_EXECUTABLE}" apply "${TRACK2STEM_WEBVIEW_PATCH}"
-    WORKING_DIRECTORY "${iplug2_SOURCE_DIR}" RESULT_VARIABLE TRACK2STEM_PATCH_RESULT)
-  if(NOT TRACK2STEM_PATCH_RESULT EQUAL 0)
-    message(FATAL_ERROR "Cannot apply the pinned WebView navigation/export fixes.")
+function(track2stem_apply_patch directory name)
+  set(patch "${CMAKE_CURRENT_SOURCE_DIR}/patches/${name}")
+  execute_process(COMMAND "${GIT_EXECUTABLE}" apply --reverse --check "${patch}"
+    WORKING_DIRECTORY "${directory}" RESULT_VARIABLE applied OUTPUT_QUIET ERROR_QUIET)
+  if(NOT applied EQUAL 0)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" apply "${patch}"
+      WORKING_DIRECTORY "${directory}" RESULT_VARIABLE result)
+    if(NOT result EQUAL 0)
+      message(FATAL_ERROR "Cannot apply pinned dependency patch ${name}.")
+    endif()
   endif()
-endif()
+endfunction()
+track2stem_apply_patch("${iplug2_SOURCE_DIR}" "webview.patch")
+track2stem_apply_patch("${iplug2_SOURCE_DIR}" "iplug-au-warning-fixes.patch")
 FetchContent_Declare(vst3sdk
   GIT_REPOSITORY https://github.com/SteinbergMedia/vst3sdk.git
   GIT_TAG 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96
@@ -34,6 +37,7 @@ FetchContent_Declare(vst3sdk
   SOURCE_SUBDIR _track2stem_dependency_only
 )
 FetchContent_MakeAvailable(vst3sdk)
+track2stem_apply_patch("${vst3sdk_SOURCE_DIR}/base" "vst3-warning-fixes.patch")
 set(IPLUG2_DIR "${iplug2_SOURCE_DIR}")
 set(IPLUG_DEPLOY_PLUGINS OFF CACHE BOOL "Never install plugins while building" FORCE)
 include("${IPLUG2_DIR}/iPlug2.cmake")

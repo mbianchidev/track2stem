@@ -39,7 +39,9 @@ def main():
         for name in ("ffmpeg", "lame", "pyav"):
             with (sources / pins[name]["archive"]).open("rb") as source:
                 assert hashlib.file_digest(source, "sha256").hexdigest() == pins[name]["sha256"], name
-        assert (sources / "patches/webview.patch").is_file()
+        for name in ("webview.patch", "lame-warning-fixes.patch", "ffmpeg-warning-fixes.patch",
+                     "iplug-au-warning-fixes.patch", "vst3-warning-fixes.patch", "pyinstaller-target-libraries.patch"):
+            assert (sources / "patches" / name).is_file(), name
         assert (sources / "CMakeLists.txt").is_file()
         home = root / "home"
         data = home / "Library/Application Support/Track2stem/Data"
@@ -59,7 +61,9 @@ def main():
         )
         for product, identifier in products:
             with (product / "Contents/Info.plist").open("rb") as source:
-                assert plistlib.load(source)["CFBundleIdentifier"] == identifier
+                metadata = plistlib.load(source)
+            assert metadata["CFBundleIdentifier"] == identifier
+            assert metadata["CFBundleShortVersionString"] == metadata["CFBundleVersion"] == report["core_version"]
             subprocess.run(["codesign", "--verify", "--strict", product], check=True)
             web = product / "Contents/Resources/web"
             assert (web / "index.html").is_file()

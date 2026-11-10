@@ -12,6 +12,8 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+from release import current_version, source_revision, validate_tag
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -19,11 +21,22 @@ def main():
     parser = argparse.ArgumentParser(description="Package the independently built VST3/AU targets and CPU runtime")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "plugin/build")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--release-tag")
     args = parser.parse_args()
     if sys.platform != "darwin" or platform.machine() != "arm64":
         parser.error("Package native Apple Silicon builds on macOS")
+    try:
+        core = current_version()
+        release = validate_tag(args.release_tag) if args.release_tag else {"version": core, "core_version": core, "tag": None}
+        revision = source_revision()
+    except ValueError as error:
+        parser.error(str(error))
+    dirty = bool(subprocess.check_output(["git", "-C", ROOT, "status", "--porcelain"], text=True).strip())
+    if args.release_tag and dirty:
+        parser.error("Release packaging requires a clean source checkout")
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    output = (args.output or ROOT / "plugin/dist" / f"Track2stem-0.1.0-macos-arm64-{stamp}").resolve()
+    suffix = "" if args.release_tag else f"-{stamp}"
+    output = (args.output or ROOT / "plugin/dist" / f"Track2stem-{release['version']}-macos-arm64{suffix}").resolve()
     archive = Path(f"{output}.zip")
     if output.exists() or archive.exists():
         parser.error("Output already exists; choose a new destination rather than overwriting an artifact")
@@ -45,7 +58,7 @@ def main():
         shutil.copytree(runtime, package / "Runtime", symlinks=True)
         for name in ("Notices", "ThirdPartySources"):
             shutil.copytree(build / "runtime-dist" / name, package / name)
-        for name in ("CMakeLists.txt", "requirements-build.txt", "build.sh", "collect-notices.py", "audit-runtime.py"):
+        for name in ("CMakeLists.txt", "requirements-build.txt", "build.sh", "collect-notices.py", "audit-runtime.py", "release.py"):
             shutil.copy2(ROOT / "plugin" / name, package / "ThirdPartySources" / name)
         shutil.copytree(ROOT / "plugin/patches", package / "ThirdPartySources/patches")
         shutil.copytree(ROOT / "plugin/hooks", package / "ThirdPartySources/hooks", ignore=shutil.ignore_patterns("__pycache__"))
@@ -62,7 +75,8 @@ def main():
                 package / "Runtime/track2stem-worker", "--root", Path(validation) / "data",
                 "--models", Path(validation) / "models", "--self-test",
             ], env=environment, text=True)
-        report = {"version": "0.1.0", "architecture": "arm64", "built_at": stamp,
+        report = {**release, "source_revision": revision, "source_dirty": dirty,
+                  "architecture": "arm64", "built_at": stamp,
                   "signing": "ad-hoc; not Apple-notarized", "runtime": json.loads(test),
                   "models_bundled": False}
         python_version = report["runtime"]["python_version"]

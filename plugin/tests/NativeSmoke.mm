@@ -62,7 +62,9 @@ void Require(bool condition, const char* message) {
   if (!condition) throw std::runtime_error(message);
 }
 
+#ifndef TRACK2STEM_STUDIO_DUO_PROBE
 void Check(OSStatus status, const char* message) { Require(status == noErr, message); }
+#endif
 
 id ProbePanel(id, SEL) { return [[Track2stemProbeSavePanel alloc] init]; }
 
@@ -306,7 +308,9 @@ int main(int argc, char** argv) {
       HostComponent component = AudioComponentRegister(&description, CFSTR("Track2stem: Track2stem"), 256, factory);
       Require(component != nullptr, "Cannot register the explicit AU factory");
 #endif
-      NSData* source = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:argv[5]]];
+      NSString* fixturePath = [NSString stringWithUTF8String:argv[5]];
+      Require(fixturePath != nil, "The generated WAV fixture path is not valid UTF-8");
+      NSData* source = [NSData dataWithContentsOfFile:fixturePath];
       Require(source.length > 44, "The generated WAV fixture is missing");
       SavedState saved {};
       Audio audio;

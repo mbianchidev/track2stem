@@ -1,6 +1,8 @@
 import sys
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     if sys.argv[1:2] == ["--drums-component"]:
         from drum_transcriber.__main__ import main
         main(sys.argv[2:])

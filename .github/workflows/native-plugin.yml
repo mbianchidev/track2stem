@@ -42,8 +42,18 @@ jobs:
             processor/requirements.txt
             plugin/requirements-build.txt
 
+      - name: Ensure Ninja is available
+        run: |
+          if ! command -v ninja >/dev/null; then
+            brew install ninja
+          fi
+          ninja --version
+
       - name: Build self-contained CPU runtime
         run: python plugin/build-runtime.py
+
+      - name: Verify native release integrity guards
+        run: python -m unittest discover -s plugin/tests -p 'test_*.py'
 
       - name: Build shared UI
         working-directory: frontend

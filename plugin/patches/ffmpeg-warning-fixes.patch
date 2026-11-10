@@ -1,0 +1,58 @@
+--- a/configure
++++ b/configure
+@@ -6177,7 +6177,7 @@
+     darwin)
+         enabled ppc && add_asflags -force_cpusubtype_ALL
+         install_name_dir_default='$(SHLIBDIR)'
+-        SHFLAGS='-dynamiclib -Wl,-single_module -Wl,-install_name,$(INSTALL_NAME_DIR)/$(SLIBNAME_WITH_MAJOR),-current_version,$(LIBVERSION),-compatibility_version,$(LIBMAJOR)'
++        SHFLAGS='-dynamiclib -Wl,-install_name,$(INSTALL_NAME_DIR)/$(SLIBNAME_WITH_MAJOR),-current_version,$(LIBVERSION),-compatibility_version,$(LIBMAJOR)'
+         enabled x86_32 && append SHFLAGS -Wl,-read_only_relocs,suppress
+         strip="${strip} -x"
+         add_ldflags -Wl,-dynamic,-search_paths_first
+--- a/libavcodec/aac_ac3_parser.c
++++ b/libavcodec/aac_ac3_parser.c
+@@ -89,7 +89,7 @@
+     *poutbuf_size = buf_size;
+ 
+     if (got_frame) {
+-        int bit_rate;
++        int bit_rate = 0;
+ 
+         /* Due to backwards compatible HE-AAC the sample rate, channel count,
+            and total number of samples found in an AAC ADTS header are not
+--- a/libavfilter/setpts.c
++++ b/libavfilter/setpts.c
+@@ -145,6 +145,7 @@
+     return 0;
+ }
+ 
++#if CONFIG_SETPTS_FILTER
+ static int config_output_video(AVFilterLink *outlink)
+ {
+     FilterLink *l = ff_filter_link(outlink);
+@@ -155,6 +156,7 @@
+ 
+     return 0;
+ }
++#endif
+ 
+ #define BUF_SIZE 64
+ 
+--- a/libavformat/rawdec.c
++++ b/libavformat/rawdec.c
+@@ -103,6 +103,7 @@
+     return 0;
+ }
+ 
++#if CONFIG_DATA_DEMUXER
+ static int raw_data_read_header(AVFormatContext *s)
+ {
+     AVStream *st = avformat_new_stream(s, NULL);
+@@ -113,6 +114,7 @@
+     st->start_time = 0;
+     return 0;
+ }
++#endif
+ 
+ /* Note: Do not forget to add new entries to the Makefile as well. */
+ 

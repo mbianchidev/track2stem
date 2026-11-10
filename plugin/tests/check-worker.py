@@ -61,7 +61,7 @@ def completed(base, job):
     raise TimeoutError("Native inference did not complete within three minutes")
 
 
-def check_downloads(base, job, expected, codec, directory, ffprobe):
+def check_downloads(base, job, expected, codec, directory, ffprobe, duration=6):
     if set(job["output_files"]) != set(expected):
         raise AssertionError(f"Unexpected stems: {list(job['output_files'])}")
     for stem in expected:
@@ -74,7 +74,7 @@ def check_downloads(base, job, expected, codec, directory, ffprobe):
         audio = next(stream for stream in data["streams"] if stream["codec_type"] == "audio")
         assert audio["codec_name"] == codec, audio
         assert int(audio["sample_rate"]) == 44100 and audio["channels"] == 2, audio
-        assert abs(float(data["format"]["duration"]) - 6) < .12, data
+        assert abs(float(data["format"]["duration"]) - duration) < .12, data
         if codec == "pcm_s16le":
             assert audio["bits_per_sample"] == 16, audio
         if codec == "mp3":
@@ -88,12 +88,18 @@ def main():
     parser.add_argument("--ui", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--fixture-only", type=Path)
+    parser.add_argument("--youtube-url")
+    parser.add_argument("--youtube-seconds", type=float)
     args = parser.parse_args()
     if args.fixture_only:
         args.fixture_only.write_bytes(fixture())
         return
     if not all((args.worker, args.models, args.ui, args.output)):
         parser.error("--worker, --models, --ui and --output are required for inference")
+    if ((args.youtube_url is None) != (args.youtube_seconds is None)
+            or (args.youtube_url is not None and not args.youtube_url.strip())
+            or (args.youtube_seconds is not None and not 0 < args.youtube_seconds <= 3600)):
+        parser.error("Live import requires both an authorized synthetic --youtube-url and positive --youtube-seconds")
     args.output.mkdir(parents=True, exist_ok=False)
     environment = {key: value for key, value in os.environ.items()
                    if key not in {"PYTHONPATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "VIRTUAL_ENV"}}
@@ -139,7 +145,22 @@ def main():
                 "model": "hdemucs_mmi",
             }, audio))
             check_downloads(base, mp3, ("drums", "backing"), "mp3", args.output, ffprobe)
-            print(json.dumps({"status": "pass", "contract": 1, "jobs": 3, "cpu_only": True,
+            if args.youtube_url:
+                imported = completed(base, request(base, "/import", {
+                    "url": args.youtube_url,
+                    "settings": {"model": "hdemucs_mmi", "segment": "7", "overlap": ".1",
+                                 "output_format": "mp3", "stem_mode": "isolate", "isolate_stem": "vocals"},
+                }))
+                clock = args.output / "live-source-clock.wav"
+                with urllib.request.urlopen(base + f"/stems/{imported['id']}/other") as response:
+                    clock.write_bytes(response.read())
+                info = json.loads(subprocess.check_output(
+                    [ffprobe, "-v", "error", "-show_format", "-of", "json", clock]))
+                duration = float(info["format"]["duration"])
+                assert abs(duration - args.youtube_seconds) < 1, info
+                check_downloads(base, imported, ("vocals", "instrumental"), "mp3", args.output, ffprobe, duration)
+            print(json.dumps({"status": "pass", "contract": 1, "jobs": 4 if args.youtube_url else 3, "cpu_only": True,
+                              "live_import": bool(args.youtube_url),
                               "formats": ["PCM16 WAV", "FLAC", "320-kbps MP3"],
                               "practice_artifacts": len(six["artifacts"]) + len(flac["artifacts"])}))
         finally:
@@ -150,6 +171,9 @@ def main():
                 except subprocess.TimeoutExpired:
                     os.killpg(worker.pid, signal.SIGKILL)
                     worker.wait(timeout=3)
+    diagnostics = (args.output / "worker.log").read_text(encoding="utf-8")
+    assert "unrecognized arguments: -B" not in diagnostics, "Frozen multiprocessing bypassed freeze_support"
+    assert "resource_tracker: process died unexpectedly" not in diagnostics, "Owned resource tracker crashed"
 
 
 if __name__ == "__main__":

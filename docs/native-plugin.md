@@ -8,9 +8,9 @@ The audio callback is a zero-latency pass-through. Inference, decoding, conversi
 
 ## Install a package
 
-Native builds are currently development artifacts, not a signed/notarized public release. Build from the repository using the instructions below, or use an artifact whose origin and SHA-256 checksum you have verified. Never disable Gatekeeper globally or bypass a malware warning.
+Native packages are ad-hoc signed, not Apple-notarized. Build from the repository using the instructions below, or use a release artifact whose origin and SHA-256 checksum you have verified. Automatic tag publishing is currently disabled; the [release workflow](#release-workflow) requires explicit manual action. Never disable Gatekeeper globally or bypass a malware warning.
 
-1. Extract the complete `Track2stem-0.1.0-macos-arm64-*.zip`, preserving its symlinks.
+1. Extract the complete `Track2stem-VERSION-macos-arm64.zip` release, or its timestamped development equivalent, preserving symlinks.
 2. Quit the DAW, then run `Install.command` from the extracted folder.
 3. Open the DAW and scan for **Track2stem**. Choose VST3 or AU, not both in the same insert.
 4. Open its editor, select an authorized audio file, choose separation settings, and process it. First use of a model downloads its weights; audio stays local.
@@ -55,7 +55,7 @@ Studio Duo's generic extended-effect probe retains `qualificationStatus: not-qua
 
 ## Build independently of the web stack
 
-Use native Apple Silicon, Python 3.14, Node.js 26.12.1, Xcode Command Line Tools, CMake, Make, and pkg-config. The Go service and Docker are not build prerequisites.
+Use native Apple Silicon, Python 3.14, Node.js 26.12.1, Xcode Command Line Tools, CMake, Make, and pkg-config. Install Ninja for the isolated Studio Duo qualification build; it avoids nested Make jobserver fallback. The Go service and Docker are not build prerequisites.
 
 ```bash
 bash plugin/build.sh
@@ -63,7 +63,11 @@ bash plugin/build.sh
 
 The script provisions checksum-pinned standalone Python 3.14.9 into the build directory, installs declared dependencies in its isolated runtime environment, builds an LGPL-only FFmpeg/LAME stack, compiles PyAV against those libraries, freezes the Python worker, builds the shared React UI with local fonts, compiles the VST3/AU wrappers, and writes a timestamped ZIP plus SHA-256 file under `plugin/dist/`. It does not install plugins or publish a release.
 
-Builds fetch pinned iPlug2 and VST3 SDK revisions into the ignored build directory. Automatic SDK deployment into the user's Library is disabled. A small WebView patch prevents double navigation callbacks and loading-state export-message loss, treats a cancelled save dialog as cancellation, rejects HTTP export errors, and uses WebKit's actual failure-callback selector. A Mach-O audit rejects machine-local library references and records the deployment floor. Model weights are not bundled.
+Builds fetch pinned iPlug2 and VST3 SDK revisions into the ignored build directory. Automatic SDK deployment into the user's Library is disabled. Checked-in dependency patches fix WebView navigation/export behavior, AU UTF-8 context-name allocation, VST integer conversion bounds, codec undefined shifts and feature-disabled C compilation. Codec source archives, applied patches and rebuild scripts accompany packages. A Mach-O audit rejects machine-local library references and records the deployment floor. Model weights are not bundled.
+
+Freezing collects inference dependencies and package data rather than importing optional training/export datasets. Torch's required Dynamo/Inductor dependency graph is retained. The macOS CPU hook declares foreign Linux/Windows/GPU libraries outside the target; the pinned freezer patch respects those explicit exclusions before attempting ctypes resolution. Unexpected missing libraries and compiler diagnostics are not globally silenced.
+
+The frozen entrypoint dispatches multiprocessing/resource-tracker children before application argument parsing. Bundled FFmpeg includes the MOV muxer option table required by yt-dlp's common `-movflags` postprocessing arguments, including when its requested output is WAV. An explicit authorized synthetic live import can be checked with `check-worker.py --youtube-url URL --youtube-seconds SECONDS` in addition to its normal worker/UI/model/output arguments.
 
 For focused wrapper development:
 
@@ -109,6 +113,24 @@ python3.14 plugin/tests/check-studio-duo.py \
 Repeat with `Track2stem.component` and a different `--output` to exercise AU. The helper uses a temporary HOME, a minimal environment, process-local AU registration and real `.studioduo` project packages. Only native file-dialog selection is replaced. Native CI runs both formats against the freshly frozen worker and reuses the host build; its timeout includes this independent host compilation.
 
 Native debugging can override `TRACK2STEM_WORKER`, `TRACK2STEM_DATA_DIR` and `TRACK2STEM_MODELS_DIR` before starting an isolated host. Worker logs are written under the selected data root. Do not point qualification tools at a user's live project or alter their global plugin catalog.
+
+## Release workflow
+
+[Native release](../.github/workflows/release.yml) follows the separate build, verified-artifact upload/download and publication pattern used for VST releases. It currently has **no automatic tag/push trigger**. Only `workflow_dispatch` is active, and `publish` defaults to `false`; creating a tag alone does not run or publish a release.
+
+Maintain the same numeric core version in `plugin/config.h` (`PLUG_VERSION_STR` and `PLUG_VERSION_HEX`) and `plugin/CMakeLists.txt`. Preview the contract without changing files, commits, tags or releases:
+
+```bash
+python3.14 plugin/release.py --validate-tag v0.1.0
+```
+
+For an explicitly prepared existing tag, manually dispatch the workflow with that tag. Leave `publish=false` for a verified Actions package only. Setting `publish=true` explicitly enables the publishing job. This documentation does not authorize creating a tag or publishing a release.
+
+The workflow checks out the exact `refs/tags/vVERSION` commit, verifies source/version agreement, builds the full Apple Silicon VST3/AU/CPU package, exercises actual frozen inference, and tests installation in an isolated HOME. Publication rechecks downloaded SHA-256 sidecars, source revision, clean-source metadata, numeric bundle versions and Mach-O arm64 headers. It creates a draft GitHub Release, verifies the uploaded assets again, then publishes that draft. Existing releases are never updated or overwritten automatically; failures can leave a draft for explicit recovery.
+
+Release assets are `Track2stem-VERSION-macos-arm64.zip` plus `.zip.sha256`, containing both plugin formats, the portable runtime, installer, notices and corresponding source/patches. No weights are bundled. SemVer prerelease/build suffixes remain in the tag, archive name and `BuildInfo.json`; host bundle/plugin version fields retain their required numeric core. Prerelease tags are marked as GitHub prereleases. Signing remains ad-hoc, not Developer ID/notarization.
+
+To enable future automatic releases, a maintainer must explicitly uncomment the `push.tags: ['v*']` trigger in the workflow. The same validated build/publication pipeline then runs for new version tags. Repository visibility changes do not silently enable it.
 
 ## Runtime and dependency licenses
 

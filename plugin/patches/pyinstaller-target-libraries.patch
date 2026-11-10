@@ -1,0 +1,11 @@
+--- a/PyInstaller/depend/utils.py
++++ b/PyInstaller/depend/utils.py
+@@ -40,6 +40,8 @@
+         if not binary:
+             # None values have to be removed too.
+             binaries.remove(binary)
++        elif not include_library(binary):
++            binaries.remove(binary)
+         elif binary != os.path.basename(binary):
+             # TODO make these warnings show up somewhere.
+             try:

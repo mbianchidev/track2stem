@@ -51,17 +51,36 @@ def dependency(name, pins, build):
     return directory, archive
 
 
+def patch_source(directory, name):
+    patch = PLUGIN / "patches" / name
+    reverse = subprocess.run(
+        ["patch", "-p1", "--batch", "--force", "--fuzz=0", "--dry-run", "--reverse", "--input", patch],
+        cwd=directory, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+    )
+    if reverse.returncode == 0:
+        return
+    if reverse.returncode != 1:
+        raise RuntimeError(f"Cannot inspect source patch {name}: {reverse.stderr}")
+    run(["patch", "-p1", "--batch", "--forward", "--fuzz=0", "--input", patch], cwd=directory)
+
+
 def build_codecs(pins, build, workers):
     prefix = build / "codecs"
     marker = prefix / ".track2stem-codecs-ready"
-    fingerprint = hashlib.sha256(json.dumps(pins, sort_keys=True).encode() + Path(__file__).read_bytes()).hexdigest()
+    patch_bytes = b"".join((PLUGIN / "patches" / name).read_bytes()
+                           for name in ("lame-warning-fixes.patch", "ffmpeg-warning-fixes.patch"))
+    fingerprint = hashlib.sha256(json.dumps(pins, sort_keys=True).encode()
+                                 + Path(__file__).read_bytes() + patch_bytes).hexdigest()
     lame, _ = dependency("lame", pins, build)
     ffmpeg, _ = dependency("ffmpeg", pins, build)
+    patch_source(lame, "lame-warning-fixes.patch")
+    patch_source(ffmpeg, "ffmpeg-warning-fixes.patch")
     if marker.exists() and marker.read_text() == fingerprint:
         return prefix
     environment = {**os.environ,
                    "CFLAGS": "-O2 -mmacosx-version-min=14.0",
                    "LDFLAGS": "-mmacosx-version-min=14.0",
+                   "lt_cv_apple_cc_single_mod": "no",
                    "PKG_CONFIG_PATH": str(prefix / "lib/pkgconfig")}
     run([lame / "configure", f"--prefix={prefix}", "--disable-shared", "--enable-static",
          "--disable-frontend", "--disable-decoder", "--with-pic"], cwd=lame, env=environment)
@@ -77,7 +96,7 @@ def build_codecs(pins, build, workers):
         "--enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis",
         "--enable-decoder=aac,aac_fixed,alac,flac,mp3,mp3float,opus,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_u8",
         "--enable-encoder=pcm_f32le,pcm_s16le,flac,libmp3lame",
-        "--enable-muxer=wav,flac,mp3",
+        "--enable-muxer=wav,flac,mp3,mov",
         "--enable-filter=aformat,aresample,anull,amix,volume,atrim,asetpts",
         f"--extra-cflags=-mmacosx-version-min=14.0 -I{shlex.quote(str(prefix / 'include'))}",
         f"--extra-ldflags=-mmacosx-version-min=14.0 -L{shlex.quote(str(prefix / 'lib'))}",
@@ -121,6 +140,7 @@ def main():
         run([python, "-m", "pip", "install", "-r", PLUGIN / "requirements-build.txt"])
         marker.write_text(fingerprint, encoding="ascii")
     run([python, "-m", "pip", "check"])
+    patch_source(environment / "lib/python3.14/site-packages", "pyinstaller-target-libraries.patch")
     pyav, _ = dependency("pyav", pins, build)
     av_marker = environment / ".track2stem-source-pyav"
     if not av_marker.exists() or av_marker.read_text() != pins["pyav"]["sha256"]:
@@ -143,10 +163,12 @@ def main():
     ]
     for library in sorted((codecs / "lib").glob("*.dylib")):
         command.extend(["--add-binary", f"{library}:."])
+    distributions = {"dora": "dora-search", "sklearn": "scikit-learn"}
     for package in ("demucs", "dora", "torchaudio", "faster_whisper", "beat_this",
                     "safetensors", "asteroid_filterbanks", "sklearn",
                     "ctranslate2", "onnxruntime", "librosa", "yt_dlp", "yt_dlp_ejs", "av"):
-        command.extend(["--collect-all", package])
+        distribution = distributions.get(package, package.replace("_", "-"))
+        command.extend(["--collect-data", package, "--copy-metadata", distribution])
     command.extend(["--copy-metadata", "torch", ROOT / "processor/worker_entry.py"])
     run(command, env={**os.environ, "DYLD_LIBRARY_PATH": str(codecs / "lib")})
     runtime = build / "runtime-dist/track2stem-worker"

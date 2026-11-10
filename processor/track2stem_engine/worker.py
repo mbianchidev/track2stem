@@ -384,9 +384,18 @@ def main():
         import asteroid_filterbanks
         if torch.version.cuda is not None:
             raise RuntimeError("The native runtime must be CPU-only")
+        import numpy as np
+        from .vocals import split_vocals
+        rng = np.random.default_rng(2026)
+        first, second = rng.laplace(size=4096), rng.uniform(-1, 1, size=4096)
+        stereo = np.column_stack((first + second, first + second * .35)).astype(np.float32) * .01
+        lead, backing = split_vocals(stereo, 44100, args.models, lambda *_: None,
+                                    threading.Event(), method="spatial")
+        if not np.isfinite(lead).all() or not np.isfinite(backing).all() or not np.allclose(lead + backing, stereo, atol=1e-7):
+            raise RuntimeError("The frozen spatial CPU dependency failed its functional check")
         run_command([ffmpeg(), "-version"], timeout=10)
         run_command([os.environ.get("TRACK2STEM_NODE", "node"), "--version"], timeout=10)
-        print(json.dumps({"version": CONTRACT_VERSION, "status": "ok", "cpu_only": True,
+        print(json.dumps({"version": CONTRACT_VERSION, "status": "ok", "cpu_only": True, "spatial_cpu": True,
                           "python_version": sys.version.split()[0], "torch": torch.__version__,
                           "openssl_version": ssl.OPENSSL_VERSION, "flask_loaded": "flask" in sys.modules}))
         return

@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -28,6 +29,8 @@ def main():
         parser.error("Use native macOS Apple Silicon for the supported host workflow")
     if args.output.exists():
         parser.error("Evidence already exists; choose a new output directory")
+    if shutil.which("ninja") is None:
+        parser.error("Install Ninja before building the isolated Studio Duo host")
     build = args.build_dir.resolve()
     build.mkdir(parents=True, exist_ok=True)
     source = build / "studio-duo-host"
@@ -42,8 +45,8 @@ def main():
     actual = subprocess.check_output(["git", "-C", source, "rev-parse", "HEAD"], text=True).strip()
     if actual != HOST_COMMIT:
         raise RuntimeError("The owned test host is not the pinned Studio Duo revision")
-    host_build = build / "studio-duo-host-build"
-    run(["cmake", "-S", source, "-B", host_build, "-DCMAKE_BUILD_TYPE=Release",
+    host_build = build / "studio-duo-host-build-ninja"
+    run(["cmake", "-G", "Ninja", "-S", source, "-B", host_build, "-DCMAKE_BUILD_TYPE=Release",
          "-DSTUDIO_DUO_BUILD_TESTS=ON", "-DSTUDIO_DUO_NATIVE_TESTS=ON", "-DCMAKE_OSX_ARCHITECTURES=arm64",
          f"-DCMAKE_PROJECT_StudioDuo_INCLUDE={ROOT / 'plugin/tests/StudioDuoProbe.cmake'}"])
     run(["cmake", "--build", host_build, "--target", "StudioDuoTests", "--parallel", "3"])

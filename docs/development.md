@@ -174,6 +174,8 @@ python -m pytest -q
 
 The tests cover validation/path safety, real FFmpeg exports and per-instrument remixes, variable-tempo synthetic clicks, complementary vocal windows, note re-attacks, MusicXML/MIDI timing, lyrics/subtitles, safe video imports and the Flask adapter. `conftest.py` redirects web storage to temporary directories. Mocked model outputs do not establish separation/transcription quality or native runtime compatibility; real inference remains a separate requirement.
 
+CI promotes numeric `RuntimeWarning` diagnostics to errors. Pitch evidence uses bounded float64 YIN input so Librosa's lazily specialized Numba complex-magnitude loop cannot introduce an order-dependent float64-to-float32 output cast. To verify a cold JIT cache without removing any shared/user cache, set `NUMBA_CACHE_DIR` to a new temporary directory and run `python -m pytest -q -W error::RuntimeWarning`. Native release identity/checksum tests run with `python -m unittest discover -s plugin/tests -p test_release.py` from the repository root.
+
 ## Container and integration checks
 
 From the repository root:
@@ -187,7 +189,7 @@ docker compose up -d --wait --wait-timeout 300
 
 CI builds all images, checks startup health, and runs the real browser separation suite through Nginx. Health checks alone do not prove model inference. For processing changes, use generated audio or a synthetic fixture, verify separation completes, download the expected stems, and inspect logs and audio before opening a PR. Never use private or customer data in tests, logs, screenshots, or examples.
 
-There is no release/publish entrypoint in the current repository. Compose builds local images; do not treat those development images as a published container release.
+Compose builds local images and has no container-publication entrypoint; do not treat those images as a published container release. The independent [native release workflow](native-plugin.md#release-workflow) can publish verified VST3/AU packages after explicit activation/manual authorization. Its automatic tag trigger is intentionally disabled.
 
 ### CI image caching
 
