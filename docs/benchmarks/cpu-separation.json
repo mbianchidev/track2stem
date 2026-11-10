@@ -1,0 +1,658 @@
+{
+  "scope": "generated MIDI/SoundFont corpus only; not a general song-quality guarantee",
+  "font_sha256": "9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe",
+  "font_license": "https://github.com/mrbumpy409/GeneralUser-GS/blob/684543d5e5efaef08d02be50dcda8d552478fa60/documentation/LICENSE.txt",
+  "python": "3.14.10",
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "available_cpus": 18,
+  "schema": 1,
+  "libraries": {
+    "torch": "2.15.0",
+    "torchaudio": "2.11.1",
+    "demucs": "4.0.1",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1"
+  },
+  "measurement_policy": "Each performance case ran in a separate process, one cold and three warm inferences; no competing evaluations launched by this session. RSS is process high-water before reference scoring, not device allocation.",
+  "baseline": [
+    {
+      "case": "clean",
+      "model": "htdemucs_6s",
+      "workers": 1,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 11.655710290884599,
+      "warm_seconds": [
+        11.260405167005956,
+        11.262009416008368,
+        11.312382834032178
+      ],
+      "warm_median_seconds": 11.262009416008368,
+      "real_time_factor": 0.1877001569334728,
+      "process_peak_rss_bytes": 2215919616,
+      "process_cpu_seconds": 176.302012,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4584321126804904
+        },
+        "drums": {
+          "si_sdr_db": 10.67704940078974
+        },
+        "bass": {
+          "si_sdr_db": 7.108998591488315
+        },
+        "other": {
+          "si_sdr_db": -2.148498013646286
+        }
+      }
+    },
+    {
+      "case": "clean",
+      "model": "htdemucs_6s",
+      "workers": 2,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 8.422165249940008,
+      "warm_seconds": [
+        7.591151874978095,
+        7.678898582933471,
+        7.91479270812124
+      ],
+      "warm_median_seconds": 7.678898582933471,
+      "real_time_factor": 0.12798164304889117,
+      "process_peak_rss_bytes": 3298000896,
+      "process_cpu_seconds": 187.90358099999997,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4584321126804904
+        },
+        "drums": {
+          "si_sdr_db": 10.67704940078974
+        },
+        "bass": {
+          "si_sdr_db": 7.108998591488315
+        },
+        "other": {
+          "si_sdr_db": -2.148498013646286
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0
+    },
+    {
+      "case": "clean",
+      "model": "htdemucs_6s",
+      "workers": 4,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 6.749633583938703,
+      "warm_seconds": [
+        6.227949124993756,
+        6.423905625008047,
+        6.308904957957566
+      ],
+      "warm_median_seconds": 6.308904957957566,
+      "real_time_factor": 0.10514841596595943,
+      "process_peak_rss_bytes": 3781443584,
+      "process_cpu_seconds": 144.24491100000003,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4584326857025376
+        },
+        "drums": {
+          "si_sdr_db": 10.677049925506815
+        },
+        "bass": {
+          "si_sdr_db": 7.108998562533852
+        },
+        "other": {
+          "si_sdr_db": -2.1484999426251186
+        }
+      },
+      "parallel_maximum_sample_difference": 7.562339305877686e-07
+    },
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 1,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 6.188739374978468,
+      "warm_seconds": [
+        5.6182088339701295,
+        5.647691291989759,
+        5.5831613331101835
+      ],
+      "warm_median_seconds": 5.6182088339701295,
+      "real_time_factor": 0.09363681389950215,
+      "process_peak_rss_bytes": 7430930432,
+      "process_cpu_seconds": 84.54048,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4876857143254405
+        },
+        "drums": {
+          "si_sdr_db": 11.017337042041122
+        },
+        "bass": {
+          "si_sdr_db": 8.510219012679597
+        },
+        "other": {
+          "si_sdr_db": 2.749193583208016
+        }
+      }
+    },
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 2,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.147384374868125,
+      "warm_seconds": [
+        4.465290958061814,
+        4.625485083088279,
+        4.511760291177779
+      ],
+      "warm_median_seconds": 4.511760291177779,
+      "real_time_factor": 0.07519600485296299,
+      "process_peak_rss_bytes": 8802942976,
+      "process_cpu_seconds": 88.889926,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4876857143254405
+        },
+        "drums": {
+          "si_sdr_db": 11.017337042041122
+        },
+        "bass": {
+          "si_sdr_db": 8.510219012679597
+        },
+        "other": {
+          "si_sdr_db": 2.749193583208016
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0
+    },
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 4,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.507942083990201,
+      "warm_seconds": [
+        4.866290959063917,
+        4.826871458208188,
+        5.170852542156354
+      ],
+      "warm_median_seconds": 4.866290959063917,
+      "real_time_factor": 0.08110484931773196,
+      "process_peak_rss_bytes": 8844607488,
+      "process_cpu_seconds": 65.07465,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.48768534380443
+        },
+        "drums": {
+          "si_sdr_db": 11.017337010378922
+        },
+        "bass": {
+          "si_sdr_db": 8.510219048972452
+        },
+        "other": {
+          "si_sdr_db": 2.7491935244826413
+        }
+      },
+      "parallel_maximum_sample_difference": 1.3783574104309082e-06
+    },
+    {
+      "case": "metal",
+      "model": "htdemucs_6s",
+      "workers": 1,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 11.947512916987762,
+      "warm_seconds": [
+        11.42498041712679,
+        11.589155124966055,
+        11.695923417108133
+      ],
+      "warm_median_seconds": 11.589155124966055,
+      "real_time_factor": 0.19315258541610092,
+      "process_peak_rss_bytes": 2283175936,
+      "process_cpu_seconds": 179.177152,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 1.3895727812221017
+        },
+        "drums": {
+          "si_sdr_db": 9.595889066656957
+        },
+        "bass": {
+          "si_sdr_db": 9.84878548307852
+        },
+        "other": {
+          "si_sdr_db": 5.305041941869424
+        }
+      }
+    },
+    {
+      "case": "metal",
+      "model": "htdemucs_6s",
+      "workers": 2,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 8.08336866600439,
+      "warm_seconds": [
+        7.715859625022858,
+        7.970229832921177,
+        7.859911958919838
+      ],
+      "warm_median_seconds": 7.859911958919838,
+      "real_time_factor": 0.13099853264866396,
+      "process_peak_rss_bytes": 3374776320,
+      "process_cpu_seconds": 189.588447,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 1.3895727812221017
+        },
+        "drums": {
+          "si_sdr_db": 9.595889066656957
+        },
+        "bass": {
+          "si_sdr_db": 9.84878548307852
+        },
+        "other": {
+          "si_sdr_db": 5.305041941869424
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0
+    },
+    {
+      "case": "metal",
+      "model": "htdemucs_6s",
+      "workers": 4,
+      "overlap": 0.25,
+      "duration_seconds": 60.0,
+      "cold_seconds": 7.076321915956214,
+      "warm_seconds": [
+        6.569815083174035,
+        6.639460082864389,
+        6.853940125089139
+      ],
+      "warm_median_seconds": 6.639460082864389,
+      "real_time_factor": 0.11065766804773981,
+      "process_peak_rss_bytes": 3869229056,
+      "process_cpu_seconds": 151.07906999999997,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 1.3895729142335576
+        },
+        "drums": {
+          "si_sdr_db": 9.595889209828607
+        },
+        "bass": {
+          "si_sdr_db": 9.84878537986191
+        },
+        "other": {
+          "si_sdr_db": 5.305041894631727
+        }
+      },
+      "parallel_maximum_sample_difference": 1.8365681171417236e-06
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 1,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 6.311377624981105,
+      "warm_seconds": [
+        5.671943708090112,
+        5.667248666053638,
+        5.682623458094895
+      ],
+      "warm_median_seconds": 5.671943708090112,
+      "real_time_factor": 0.09453239513483519,
+      "process_peak_rss_bytes": 7425933312,
+      "process_cpu_seconds": 85.899189,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.789118763173708
+        },
+        "drums": {
+          "si_sdr_db": 9.46600127465345
+        },
+        "bass": {
+          "si_sdr_db": 9.864832509502081
+        },
+        "other": {
+          "si_sdr_db": 5.756784179168424
+        }
+      }
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 2,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.305332332849503,
+      "warm_seconds": [
+        4.401299457997084,
+        4.548791750101373,
+        4.706791042117402
+      ],
+      "warm_median_seconds": 4.548791750101373,
+      "real_time_factor": 0.07581319583502287,
+      "process_peak_rss_bytes": 8961015808,
+      "process_cpu_seconds": 91.503283,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.789118763173708
+        },
+        "drums": {
+          "si_sdr_db": 9.46600127465345
+        },
+        "bass": {
+          "si_sdr_db": 9.864832509502081
+        },
+        "other": {
+          "si_sdr_db": 5.756784179168424
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 4,
+      "overlap": 0.1,
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.646807791898027,
+      "warm_seconds": [
+        5.2233297501225024,
+        5.17813729098998,
+        5.199293875135481
+      ],
+      "warm_median_seconds": 5.199293875135481,
+      "real_time_factor": 0.0866548979189247,
+      "process_peak_rss_bytes": 8857894912,
+      "process_cpu_seconds": 68.418756,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.7891186901273555
+        },
+        "drums": {
+          "si_sdr_db": 9.466001037718025
+        },
+        "bass": {
+          "si_sdr_db": 9.864832812744668
+        },
+        "other": {
+          "si_sdr_db": 5.756784258518616
+        }
+      },
+      "parallel_maximum_sample_difference": 4.6938657760620117e-07
+    }
+  ],
+  "bounded_fast_profile": [
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 1,
+      "overlap": 0.1,
+      "segment": 7,
+      "duration_seconds": 60.0,
+      "cold_seconds": 6.47649283381179,
+      "warm_seconds": [
+        6.088081374997273,
+        6.0203155828639865,
+        6.103447833098471
+      ],
+      "warm_median_seconds": 6.088081374997273,
+      "real_time_factor": 0.10146802291662121,
+      "process_peak_rss_bytes": 1975107584,
+      "process_cpu_seconds": 84.879361,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4510429689694164
+        },
+        "drums": {
+          "si_sdr_db": 10.97558044790613
+        },
+        "bass": {
+          "si_sdr_db": 8.559904140902237
+        },
+        "other": {
+          "si_sdr_db": 2.7485902122112837
+        }
+      },
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.036642745356024076,
+        "drums": -0.04175659413499133,
+        "bass": 0.04968512822263982,
+        "other": -0.0006033709967323553
+      }
+    },
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 2,
+      "overlap": 0.1,
+      "segment": 7,
+      "duration_seconds": 60.0,
+      "cold_seconds": 4.528311125002801,
+      "warm_seconds": [
+        4.166398749919608,
+        3.993108249967918,
+        4.119483000133187
+      ],
+      "warm_median_seconds": 4.119483000133187,
+      "real_time_factor": 0.06865805000221978,
+      "process_peak_rss_bytes": 2803613696,
+      "process_cpu_seconds": 90.899556,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.4510429689694164
+        },
+        "drums": {
+          "si_sdr_db": 10.97558044790613
+        },
+        "bass": {
+          "si_sdr_db": 8.559904140902237
+        },
+        "other": {
+          "si_sdr_db": 2.7485902122112837
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0,
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.036642745356024076,
+        "drums": -0.04175659413499133,
+        "bass": 0.04968512822263982,
+        "other": -0.0006033709967323553
+      }
+    },
+    {
+      "case": "clean",
+      "model": "hdemucs_mmi",
+      "workers": 4,
+      "overlap": 0.1,
+      "segment": 7,
+      "libraries": {
+        "torch": "2.15.0",
+        "torchaudio": "2.11.1",
+        "demucs": "4.0.1",
+        "numpy": "2.5.4"
+      },
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.109947541961446,
+      "warm_seconds": [
+        3.774860499892384,
+        3.8908215831033885,
+        4.179095166968182
+      ],
+      "warm_median_seconds": 3.8908215831033885,
+      "real_time_factor": 0.06484702638505647,
+      "process_peak_rss_bytes": 3343171584,
+      "process_cpu_seconds": 78.102346,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.451042587506796
+        },
+        "drums": {
+          "si_sdr_db": 10.975580942359834
+        },
+        "bass": {
+          "si_sdr_db": 8.55990493849649
+        },
+        "other": {
+          "si_sdr_db": 2.7485901664782686
+        }
+      },
+      "parallel_maximum_sample_difference": 1.6242265701293945e-06,
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.03664275629763436,
+        "drums": -0.04175606801908849,
+        "bass": 0.04968588952403863,
+        "other": -0.0006033580043727227
+      }
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 1,
+      "overlap": 0.1,
+      "segment": 7,
+      "libraries": {
+        "torch": "2.15.0",
+        "torchaudio": "2.11.1",
+        "demucs": "4.0.1",
+        "numpy": "2.5.4"
+      },
+      "duration_seconds": 60.0,
+      "cold_seconds": 7.520146874943748,
+      "warm_seconds": [
+        6.730056292144582,
+        6.7347517921589315,
+        6.6422300830017775
+      ],
+      "warm_median_seconds": 6.730056292144582,
+      "real_time_factor": 0.11216760486907636,
+      "process_peak_rss_bytes": 1974747136,
+      "process_cpu_seconds": 90.647647,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.6432289190674263
+        },
+        "drums": {
+          "si_sdr_db": 9.482759773832063
+        },
+        "bass": {
+          "si_sdr_db": 9.838622877718803
+        },
+        "other": {
+          "si_sdr_db": 5.678157860448253
+        }
+      },
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.1458898441062817,
+        "drums": 0.016758499178612496,
+        "bass": -0.026209631783277842,
+        "other": -0.078626318720171
+      }
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 2,
+      "overlap": 0.1,
+      "segment": 7,
+      "libraries": {
+        "torch": "2.15.0",
+        "torchaudio": "2.11.1",
+        "demucs": "4.0.1",
+        "numpy": "2.5.4"
+      },
+      "duration_seconds": 60.0,
+      "cold_seconds": 5.40605066716671,
+      "warm_seconds": [
+        4.262924916110933,
+        3.897665875032544,
+        3.9451168328523636
+      ],
+      "warm_median_seconds": 3.9451168328523636,
+      "real_time_factor": 0.06575194721420606,
+      "process_peak_rss_bytes": 2765176832,
+      "process_cpu_seconds": 94.59906600000001,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.6432289190674263
+        },
+        "drums": {
+          "si_sdr_db": 9.482759773832063
+        },
+        "bass": {
+          "si_sdr_db": 9.838622877718803
+        },
+        "other": {
+          "si_sdr_db": 5.678157860448253
+        }
+      },
+      "parallel_maximum_sample_difference": 0.0,
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.1458898441062817,
+        "drums": 0.016758499178612496,
+        "bass": -0.026209631783277842,
+        "other": -0.078626318720171
+      }
+    },
+    {
+      "case": "metal",
+      "model": "hdemucs_mmi",
+      "workers": 4,
+      "overlap": 0.1,
+      "segment": 7,
+      "libraries": {
+        "torch": "2.15.0",
+        "torchaudio": "2.11.1",
+        "demucs": "4.0.1",
+        "numpy": "2.5.4"
+      },
+      "duration_seconds": 60.0,
+      "cold_seconds": 4.822456166148186,
+      "warm_seconds": [
+        3.912395083112642,
+        4.010619167005643,
+        3.9275446669198573
+      ],
+      "warm_median_seconds": 3.9275446669198573,
+      "real_time_factor": 0.06545907778199762,
+      "process_peak_rss_bytes": 3254124544,
+      "process_cpu_seconds": 78.282968,
+      "common_four_stem_quality": {
+        "vocals": {
+          "si_sdr_db": 2.6432293958508133
+        },
+        "drums": {
+          "si_sdr_db": 9.482759876221659
+        },
+        "bass": {
+          "si_sdr_db": 9.838622634684183
+        },
+        "other": {
+          "si_sdr_db": 5.6781579075519675
+        }
+      },
+      "parallel_maximum_sample_difference": 4.6193599700927734e-07,
+      "quality_delta_vs_unbounded_db": {
+        "vocals": -0.14588929427654218,
+        "drums": 0.01675883850363391,
+        "bass": -0.026210178060484424,
+        "other": -0.0786263509666485
+      }
+    }
+  ]
+}

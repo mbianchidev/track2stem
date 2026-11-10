@@ -118,6 +118,13 @@ def main():
             check_downloads(base, six, ("vocals", "drums", "bass", "guitar", "piano", "other"),
                             "pcm_s16le", args.output, ffprobe)
             assert {"analysis", "click", "guitar_score", "bass_midi", "drums_midi"} <= set(six["artifacts"])
+            bass_notes = request(base, f"/artifacts/{six['id']}/bass_notes")
+            assert bass_notes["selection_policy"] == "clean monophonic bassline"
+            assert len(bass_notes["raw_candidates"]) >= len(bass_notes["notes"])
+            assert six["transcriptions"]["bass"]["selection_policy"] == "clean monophonic bassline"
+            assert "raw_candidates" not in six["transcriptions"]["bass"]
+            assert all(first["end"] <= second["start"] for first, second in
+                       zip(bass_notes["notes"], bass_notes["notes"][1:]))
             mixed = request(base, f"/jobs/{six['id']}/mix", {"gains": {"bass": 1.5, "drums": .5}})
             assert mixed["gains"]["bass"] == 1.5
             flac = completed(base, request(base, "/upload", {

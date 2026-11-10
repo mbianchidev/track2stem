@@ -96,6 +96,24 @@ def infer_tuning(notes, instrument):
     }
 
 
+def pitch_evidence_windows(source, sample_rate, minimum_hz, cancelled=None, minimum_peak=.001):
+    """Yield bounded, aligned MIDI-pitch/RMS evidence with a 22050 Hz, 256-sample clock."""
+    target_rate, hop = 22050, 256
+    for offset in range(0, len(source), sample_rate * 30):
+        if cancelled:
+            check_cancelled(cancelled)
+        chunk = source[offset:offset + sample_rate * 30]
+        if chunk.ndim == 2:
+            chunk = chunk.mean(axis=1)
+        if np.max(np.abs(chunk), initial=0) < minimum_peak:
+            continue
+        mono = librosa.resample(chunk, orig_sr=sample_rate, target_sr=target_rate)
+        pitch = librosa.yin(mono, sr=target_rate, fmin=minimum_hz, fmax=500,
+                            frame_length=4096, hop_length=hop)
+        rms = librosa.feature.rms(y=mono, frame_length=4096, hop_length=hop)[0]
+        yield offset / sample_rate, librosa.hz_to_midi(pitch[:len(rms)]), rms
+
+
 def estimate_tuning(stems, sample_rate, cancelled=None):
     result = {}
     target_rate, hop = 22050, 256
@@ -104,17 +122,8 @@ def estimate_tuning(stems, sample_rate, cancelled=None):
             continue
         source = stems[instrument]
         observations = defaultdict(lambda: {"seconds": 0., "first": math.inf, "last": 0.})
-        for offset in range(0, len(source), sample_rate * 30):
-            if cancelled:
-                check_cancelled(cancelled)
-            chunk = source[offset:offset + sample_rate * 30].mean(axis=1)
-            if np.max(np.abs(chunk), initial=0) < .001:
-                continue
-            mono = librosa.resample(chunk, orig_sr=sample_rate, target_sr=target_rate)
-            pitch = librosa.yin(mono, sr=target_rate, fmin=20 if instrument == "bass" else 35,
-                                fmax=500, frame_length=4096, hop_length=hop)
-            rms = librosa.feature.rms(y=mono, frame_length=4096, hop_length=hop)[0]
-            midi = librosa.hz_to_midi(pitch[:len(rms)])
+        for offset, midi, rms in pitch_evidence_windows(
+                source, sample_rate, 20 if instrument == "bass" else 35, cancelled):
             stable = ((rms > max(.003, float(rms.max()) * .1))
                       & (np.abs(midi - np.round(midi)) < .2)
                       & (np.abs(np.diff(midi, prepend=midi[0])) < .2))
@@ -122,8 +131,8 @@ def estimate_tuning(stems, sample_rate, cancelled=None):
                 frames = np.flatnonzero(stable & (np.round(midi) == value))
                 observation = observations[int(value)]
                 observation["seconds"] += len(frames) * hop / target_rate
-                observation["first"] = min(observation["first"], offset / sample_rate + frames[0] * hop / target_rate)
-                observation["last"] = max(observation["last"], offset / sample_rate + frames[-1] * hop / target_rate)
+                observation["first"] = min(observation["first"], offset + frames[0] * hop / target_rate)
+                observation["last"] = max(observation["last"], offset + frames[-1] * hop / target_rate)
         notes = [{"pitch": pitch, "start": value["first"], "end": value["first"] + value["seconds"]}
                  for pitch, value in observations.items()]
         estimate = infer_tuning(notes, instrument)

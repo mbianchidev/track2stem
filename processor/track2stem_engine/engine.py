@@ -84,7 +84,7 @@ class Engine:
                 "filename": source.name.removeprefix(f"{job_id}_"), "settings": settings.to_dict(),
                 "mix_stems": list(settings.mix_stems), "gains": dict.fromkeys(settings.mix_stems, 1.0),
                 "stem_files": {name: str(raw_dir / f"{name}.wav") for name in settings.mix_stems},
-                "artifacts": {}, "analysis": None, "vocal_split": vocal_details,
+                "artifacts": {}, "analysis": None, "vocal_split": vocal_details, "transcriptions": {},
             }
             if vocal_details:
                 directory = job_dir / "artifacts"
@@ -141,14 +141,19 @@ class Engine:
                     if not requested:
                         continue
                     report(82, f"Transcribing {instrument}")
+                    transcription_details = {}
                     notes = (drum_notes(raw_dir / "drums.wav", self.model_dir, report, cancelled) if instrument == "drums"
                              else pitched_notes(stems[instrument], sample_rate, instrument,
-                                                self.model_dir, report, cancelled))
+                                                self.model_dir, report, cancelled, transcription_details))
                     artifacts = write_transcription(notes, instrument, job_dir / "artifacts",
                                                      (manifest["analysis"] or {}).get("tempo_changes"),
                                                      meters=(manifest["analysis"] or {}).get("meter_changes", []),
-                                                     tuning_estimate=(manifest["analysis"] or {}).get("tuning", {}).get(instrument))
+                                                     tuning_estimate=(manifest["analysis"] or {}).get("tuning", {}).get(instrument),
+                                                     details=transcription_details)
                     manifest["artifacts"].update(artifacts)
+                    if transcription_details:
+                        manifest["transcriptions"][instrument] = {
+                            key: value for key, value in transcription_details.items() if key != "raw_candidates"}
             report(90, "Exporting audio")
             manifest["outputs"] = self._render(job_dir, manifest, cancelled)
             elapsed = int(time.monotonic() - started)

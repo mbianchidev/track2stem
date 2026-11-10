@@ -35,6 +35,7 @@ type ProcessorResult struct {
 	Analysis       json.RawMessage    `json:"analysis"`
 	Lyrics         json.RawMessage    `json:"lyrics"`
 	VocalSplit     json.RawMessage    `json:"vocal_split"`
+	Transcriptions json.RawMessage    `json:"transcriptions"`
 	ProcessingTime string             `json:"processing_time"`
 }
 
@@ -135,6 +136,7 @@ func completeJob(jobID string, result ProcessorResult) {
 	job.Analysis = result.Analysis
 	job.Lyrics = result.Lyrics
 	job.VocalSplit = result.VocalSplit
+	job.Transcriptions = result.Transcriptions
 	job.ProcessingTime = result.ProcessingTime
 }
 

@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -10,7 +11,9 @@ from scipy.signal import find_peaks
 
 from .audio import check_cancelled
 from .models import get_session
-from .tuning import infer_tuning
+from .tuning import infer_tuning, pitch_evidence_windows
+
+logger = logging.getLogger(__name__)
 
 DRUM_NAMES = {
     35: "Acoustic kick", 36: "Kick", 37: "Side stick", 38: "Snare", 39: "Hand clap", 40: "Electric snare",
@@ -30,7 +33,99 @@ DRUM_POSITIONS = {
 CYMBALS = {42, 44, 46, 49, 51, 52, 54, 55, 70}
 
 
-def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled):
+def align_note_attacks(notes, mono, reattacks, cancelled=None):
+    if not notes:
+        return [], 0
+    attacks = []
+    for offset in range(0, len(mono), 30 * 22050):
+        if cancelled:
+            check_cancelled(cancelled)
+        first, last = max(0, offset - 5512), min(len(mono), offset + 30 * 22050 + 5512)
+        local = librosa.onset.onset_detect(y=mono[first:last], sr=22050, hop_length=256,
+                                          units="time", backtrack=True) + first / 22050
+        attacks.extend(local[(local >= offset / 22050) & (local < min(len(mono), offset + 30 * 22050) / 22050)])
+    attacks = np.asarray(attacks)
+    if not len(attacks):
+        return [dict(note) for note in notes], 0
+    aligned, latest, merged = [], {}, 0
+    for note in notes:
+        attack = int(np.searchsorted(attacks, note["start"], side="right") - 1)
+        supported = attack >= 0 and note["start"] - attacks[attack] <= .15
+        delayed = supported and note["start"] - attacks[attack] > .03
+        previous = latest.get(note["pitch"])
+        if (previous is not None and previous[3] and note["start"] - previous[2] <= .15
+                and ((supported and previous[1] == attack)
+                     or (not supported and (note["start"], note["pitch"]) in reattacks
+                         and previous[0]["end"] >= note["start"] - .025))):
+            previous[0]["end"] = max(previous[0]["end"], note["end"])
+            previous[0]["velocity"] = max(previous[0]["velocity"], note["velocity"])
+            merged += 1
+            continue
+        entry = dict(note)
+        if delayed:
+            entry["start"] = round(float(attacks[attack]), 5)
+        if previous is not None and entry["start"] <= previous[0]["start"] + .025:
+            previous[0]["start"] = min(previous[0]["start"], entry["start"])
+            previous[0]["end"] = max(previous[0]["end"], entry["end"])
+            previous[0]["velocity"] = max(previous[0]["velocity"], entry["velocity"])
+            merged += 1
+            continue
+        if previous is not None and previous[0]["end"] > entry["start"]:
+            previous[0]["end"] = entry["start"]
+        aligned.append(entry)
+        latest[note["pitch"]] = entry, attack if supported else None, note["start"], delayed
+    return sorted(aligned, key=lambda note: (note["start"], note["pitch"])), merged
+
+
+def clean_bassline(notes, mono, report, cancelled, details):
+    fundamentals = np.full(math.ceil(len(mono) / 256) + 1, np.nan, dtype=np.float32)
+    windows = pitch_evidence_windows(mono, 22050, 20, cancelled, minimum_peak=1e-5) if notes else ()
+    for offset, midi, rms in windows:
+        stable = ((rms > max(1e-5, float(rms.max()) * .03))
+                  & (np.abs(midi - np.round(midi)) < .4)
+                  & (np.abs(np.diff(midi, prepend=midi[0])) < .4))
+        frames = np.rint(offset * 22050 / 256 + np.arange(len(midi))).astype(int)
+        valid = stable & (frames < len(fundamentals))
+        fundamentals[frames[valid]] = midi[valid]
+    candidates = []
+    for note in notes:
+        check_cancelled(cancelled)
+        first = round((note["start"] + (note["end"] - note["start"]) * .2) * 22050 / 256)
+        last = max(first + 1, round((note["end"] - (note["end"] - note["start"]) * .2) * 22050 / 256))
+        evidence = fundamentals[first:last]
+        evidence = evidence[np.isfinite(evidence)]
+        agreement = float(np.mean(np.abs(evidence - note["pitch"]) < .6)) if len(evidence) >= 3 else 0
+        if agreement >= .5:
+            candidates.append((dict(note), agreement))
+    selected, scores = [], []
+    for note, score in candidates:
+        if selected and note["start"] < selected[-1]["end"]:
+            previous = selected[-1]
+            if note["start"] - previous["start"] < .05:
+                if (score, note["velocity"]) <= (scores[-1], previous["velocity"]):
+                    continue
+                selected.pop()
+                scores.pop()
+            else:
+                previous["end"] = note["start"]
+                if previous["end"] - previous["start"] < .04:
+                    selected.pop()
+                    scores.pop()
+        selected.append(note)
+        scores.append(score)
+    warnings = ["Bass exports prioritize one note at a time. Polyphonic alternatives remain in raw_candidates."]
+    if notes and not selected:
+        warnings.append("No stable bass fundamental agreed with the neural candidates; review raw_candidates.")
+        logger.warning(warnings[-1])
+    logger.info("Selected %d bassline notes from %d preserved candidates", len(selected), len(notes))
+    report(86, f"Selected {len(selected)} bassline notes; {len(notes)} raw candidates preserved")
+    details.update(raw_candidates=notes, selection_policy="clean monophonic bassline",
+                   fundamental_evidence="Stable YIN pitch evidence in bounded 30-second windows",
+                   rejected_candidates=len(notes) - len(selected), warnings=warnings)
+    return selected
+
+
+def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled, details=None):
     session = get_session("basic-pitch", model_dir, report, cancelled)
     mono = librosa.resample(audio.mean(axis=1), orig_sr=sample_rate, target_sr=22050)
     window, border, step = 43844, 15, 142
@@ -51,8 +146,8 @@ def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled):
         report(82 + int(4 * (index + 1) / count), f"Transcribing {instrument} {index + 1}/{count}")
     probabilities = np.concatenate(frames)[:math.ceil(len(mono) / 256)]
     attacks = np.concatenate(onsets)[:len(probabilities)]
-    low, high = (24, 67) if instrument == "bass" else (28, 88)
-    notes = []
+    low, high = (21, 67) if instrument == "bass" else (28, 88)
+    notes, reattacks = [], set()
     for midi in range(low, high + 1):
         column = midi - 21
         active = probabilities[:, column] >= .3
@@ -69,9 +164,24 @@ def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled):
                 continue
             start = max(0, first * 256 / 22050)
             end = min(len(audio) / sample_rate, last * 256 / 22050)
-            notes.append({"start": round(float(start), 5), "end": round(float(end), 5), "pitch": midi,
-                          "velocity": max(1, min(127, round(float(probabilities[first:last, column].mean()) * 127)))})
-    return sorted(notes, key=lambda note: (note["start"], note["pitch"]))
+            note = {"start": round(float(start), 5), "end": round(float(end), 5), "pitch": midi,
+                    "velocity": max(1, min(127, round(float(probabilities[first:last, column].mean()) * 127)))}
+            notes.append(note)
+            if first not in edges:
+                reattacks.add((note["start"], midi))
+    notes.sort(key=lambda note: (note["start"], note["pitch"]))
+    raw = notes
+    details = details if details is not None else {}
+    if instrument == "bass":
+        notes = clean_bassline(notes, mono, report, cancelled, details)
+        merged = 0
+    else:
+        notes, merged = align_note_attacks(notes, mono, reattacks, cancelled)
+    details.update(raw_candidates=raw, onset_alignment={
+        "method": "Neural note timing preserved for bass" if instrument == "bass"
+                  else "Acoustic backtracking of delayed attacks, bounded to 150 ms",
+        "merged_unsupported_reattacks": merged})
+    return notes
 
 
 def tempo_map(values):
@@ -281,7 +391,7 @@ def write_musicxml(notes, instrument, path, points, tuning, meters=None):
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
 
-def write_transcription(notes, instrument, directory, tempos=None, meters=None, tuning_estimate=None):
+def write_transcription(notes, instrument, directory, tempos=None, meters=None, tuning_estimate=None, details=None):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     points = tempo_map(tempos)
@@ -299,6 +409,8 @@ def write_transcription(notes, instrument, directory, tempos=None, meters=None, 
              "Without timing analysis, MIDI uses a 120 BPM reference clock."]
     if meters is None:
         lines.append("Meter: assumed 4/4 because no meter analysis was supplied.")
+    if details and details.get("selection_policy"):
+        lines.append("Bass: clean monophonic bassline; raw/polyphonic candidates are preserved in the notes JSON.")
     if tuning:
         lines.append("Proposed open strings, low to high: " + ", ".join(librosa.midi_to_note(tuning, unicode=False)))
         lines.append("Tuning and fingerings are proposals, not a unique solution.")
@@ -312,7 +424,7 @@ def write_transcription(notes, instrument, directory, tempos=None, meters=None, 
             f"string {item['string']} fret {item['fret']}" if "string" in item else f"unassigned MIDI pitch {item['pitch']}")
         lines.append(f"{item['start']:8.3f}-{item['end']:8.3f}s  {name}")
     Path(paths[f"{instrument}_tabs"]).write_text("\n".join(lines) + "\n", encoding="utf-8")
-    Path(paths[f"{instrument}_notes"]).write_text(json.dumps({
+    metadata = {
         "instrument": instrument, "notes": notes, "fingerings": assigned, "tuning": tuning,
         "tuning_estimate": tuning_estimate,
         "method": "ADT_STR setting-tau-0.8; 26 drum classes; CC-BY-SA-4.0 component"
@@ -320,5 +432,11 @@ def write_transcription(notes, instrument, directory, tempos=None, meters=None, 
         "tempo_changes": points, "meter_changes": signatures, "estimated": True,
         "warnings": ["Unassigned pitches remain in MIDI; their string/fret could not be resolved."]
                     if any("string" not in note for note in assigned) and tuning else [],
-    }, allow_nan=False), encoding="utf-8")
+    }
+    if details:
+        for key in ("raw_candidates", "selection_policy", "fundamental_evidence", "rejected_candidates", "onset_alignment"):
+            if key in details:
+                metadata[key] = details[key]
+        metadata["warnings"].extend(details.get("warnings", []))
+    Path(paths[f"{instrument}_notes"]).write_text(json.dumps(metadata, allow_nan=False), encoding="utf-8")
     return paths

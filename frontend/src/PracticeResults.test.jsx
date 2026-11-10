@@ -10,12 +10,15 @@ test('meter changes and full-track tuning evidence remain visible with real arti
       bpm: 120, meter_changes: [{ numerator: 3, denominator: 4 }, { numerator: 6, denominator: 8 }],
       tuning: { guitar: { candidate: 'Drop D', lowest_note: 'D2', analyzed_seconds: 120 } },
     },
-    artifacts: { meter: '/owned/meter.csv' },
+    artifacts: { meter: '/owned/meter.csv', bass_notes: '/owned/bass.json' },
+    transcriptions: { bass: { selection_policy: 'clean monophonic bassline' } },
   };
   render(<PracticeResults job={job} apiBase="/api" />);
   expect(screen.getByText('3/4 to 6/8')).toBeInTheDocument();
   expect(screen.getByText('Analyzed 2:00 of audio')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Meter map (CSV)' })).toHaveAttribute('href', '/api/artifacts/synthetic-practice/meter');
+  expect(screen.getByText(/raw polyphonic candidates/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Bass notes (JSON)' })).toHaveAttribute('href', '/api/artifacts/synthetic-practice/bass_notes');
 });
 
 test('undetermined meter is not shown as a fixed time signature', () => {

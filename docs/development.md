@@ -91,9 +91,60 @@ For an already-running Compose stack, use `TRACK2STEM_TEST_URL=http://127.0.0.1:
 
 ### CPU measurements
 
-One Apple Silicon check on generated 20-second stereo audio, Python 3.14.10 and CPU PyTorch 2.15.0 measured warm inference at 4.29 s for six-stem defaults with one worker, 2.99 s with two workers, and 1.90 s for the Hybrid v3 fast profile. Parallel reconstruction's maximum absolute difference was zero for this fixture.
+The [controlled CPU report](benchmarks/cpu-separation.json) uses original 60-second MIDI/SoundFont mixtures, native Apple Silicon, Python 3.14.10, CPU PyTorch 2.15.0 and 18 available logical CPUs. Each case ran in a fresh process, with one cold model load/inference followed by three warm inferences. Weights were already cached; download time is excluded. No competing evaluations were launched by the measuring session.
 
-These are individual synthetic measurements, not song-quality scores, physical deadline qualification, or general speed guarantees. The default model stays six-stem; the faster four-stem profile deliberately trades model/overlap characteristics for CPU time.
+Cells show **median warm seconds / peak process RSS in MiB**. RSS is the high-water mark across inference repetitions, measured before loading reference stems for scoring, not a GPU allocation or a per-segment estimate.
+
+| Fixture / profile | 1 worker | 2 workers | 4 workers |
+|-------------------|----------|-----------|-----------|
+| Clean / six-stem defaults | 11.26 / 2113 | 7.68 / 3145 | 6.31 / 3606 |
+| Distorted / six-stem defaults | 11.59 / 2177 | 7.86 / 3218 | 6.64 / 3690 |
+| Clean / bounded fast profile | 6.09 / 1884 | 4.12 / 2674 | 3.89 / 3188 |
+| Distorted / bounded fast profile | 6.73 / 1883 | 3.95 / 2637 | 3.93 / 3103 |
+
+Two/four six-stem workers achieved about 1.47x/1.75-1.79x speedup, with maximum sample differences below 1.84e-6. Bounded fast workers differ by at most 1.63e-6. More workers increase memory and are not always faster.
+
+The old fast setting left Hybrid v3's long default segment unbounded and peaked at 7082-8546 MiB. The actual fast preset now uses seven-second windows: its one-worker peak is about 1884 MiB, while remaining 1.72-1.85x faster than six-stem defaults on these fixtures. Shorter windows cost some one-worker time compared with the old fast setting. Common-four-stem SI-SDR changed by at most 0.146 dB relative to that setting; the raw report includes every stem, repetition, cold time, CPU time and legacy comparison. Six-stem guitar/piano outputs are summed into `other` for the common-four comparison.
+
+These are synthetic-corpus measurements, not natural-song quality scores, physical deadline qualification, minimum hardware requirements or general speed guarantees. The default model remains six-stem.
+
+### Musical measurements and reproduction
+
+[Musical reference results](benchmarks/musical-quality.json) retain failures as well as improvements. The fixtures are original MIDI rendered headlessly with the checksum-pinned GeneralUser GS 2.0.3 SoundFont. Its license permits generated music; the font remains a test download, not a bundled runtime/model asset.
+
+| Scope | Measured result |
+|-------|-----------------|
+| 128-second structural form, unchanged reference stems | Boundary F1 improved from 0.111 to 1.0 at one-second tolerance; time-weighted labels improved from 0.676 to 1.0. |
+| Same form after actual six-stem separation | Boundary F1 1.0, time-weighted labels 0.875. The bridge was labeled solo. |
+| Different 90-second clean-guitar form | Boundary F1 1.0, labels 0.889 with either reference or inferred stems. The solo was labeled bridge. |
+| Standard / room / power drum kits | Nine-class onset/pitch F1 at 50 ms: 0.952 / 0.545 / 1.0, versus 0.556 / 0.600 / 0.571 before the decoder/acoustic changes. The room kit still misclassifies toms; do not hide that regression. |
+| Clean / distorted guitar reference stems | Exact-pitch onset F1 at 50 ms: 0.918 / 0.928, versus 0.918 / 0.539 for raw neural activations. Bounded acoustic backtracking corrects delayed activations without degrading this clean reference. |
+| Bass reference stems | Fundamental-guided monophonic selection improves F1 from 0.606 to 0.967 at 50 ms. All raw candidates remain recoverable; these are reference-stem scores, not separation-plus-transcription accuracy. |
+| Original synthetic sung lyrics | Large-v3-turbo without speech VAD achieved 0 word errors on fixed 15-word and 14-word references through the production wrapper. This does not establish accuracy on natural singing. |
+| Fixed-pan two-group synthetic singing | Spatial lead/backing SI-SDR 51.39/43.23 dB versus mixture 7.98/-7.94 dB; maximum reconstruction error 2.98e-8. This does not qualify mono, changing-pan, reverberant or larger ensembles. |
+
+The licensed mono neural vocal model did not improve the robot-voice reference. Its provenance is resolved, but that is not an accuracy claim. Section scores and tuning rankings remain heuristic estimates. Drum evidence covers nine common classes, not every one of the model's 26 mapped classes.
+
+To reproduce the public MIDI corpus, provide the full processor environment, FFmpeg and the headless `fluidsynth` executable. Choose new output paths and a writable model cache:
+
+```bash
+python scripts/benchmark-audio.py \
+  --models /path/to/models --output /path/to/new-audio-benchmark \
+  --duration 60 --repeats 3
+```
+
+`--tasks separation`, `pitched`, `drums` or `sections` selects a subset. Separation cases run sequentially in isolated child processes and retain input specifications; musical checks retain their MIDI/reference data. Do not run competing model evaluations while measuring CPU time. Quality-run elapsed times are not substitutes for that isolated performance report.
+
+For private synthetic-singing evaluation on macOS, the existing Good News/Cellos system voices can generate the original reference texts:
+
+```bash
+python scripts/benchmark-lyrics.py \
+  --fixtures /private/path/to/new-singing-fixtures --models /path/to/models \
+  --model base small large-v3-turbo --vad both --generate-macos \
+  --output /private/path/to/new-lyrics-results.json
+```
+
+System-voice outputs have separate redistribution/use restrictions. Keep those audio fixtures private and outside the repository; the generator refuses a repository output path. Never publish them as benchmark assets. Neither corpus establishes broad musical accuracy; all automatic notation and labels require review.
 
 ## Backend checks
 
@@ -169,4 +220,4 @@ Nginx serves the production frontend and proxies `/api` to the backend. Vite use
 
 [The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows a generated WAV, its source waveform, six actual Demucs outputs, instrument controls, real analysis/notation exports and recent-job metadata. The browser test uploads and processes the generated fixture through Go and Flask; no completed jobs or separation results are fabricated.
 
-To refresh it, set `TRACK2STEM_CAPTURE_README=1` when running the browser integration suite. It uses a fresh 1440 px context, reselects the same generated source after actual processing, waits for waveforms/fonts, and captures the full unmodified interface. Do not use personal audio or production jobs.
+To refresh it, set `TRACK2STEM_CAPTURE_README=1` when running the browser integration suite. It uses a fresh 1440 px context, reselects the same generated source after actual processing, waits for waveforms/fonts, and captures the full unmodified interface. `TRACK2STEM_CAPTURE_FIXTURE` can select an original synthetic stereo 44.1-kHz, exactly ten-second WAV instead of the default generated tone fixture; the same processing, duration and export assertions still apply. Do not use personal audio or production jobs.

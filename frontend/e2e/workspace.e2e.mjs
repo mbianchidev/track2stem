@@ -108,7 +108,10 @@ test('real upload, practice artifacts, boosted remix and refresh remain usable',
   for (const name of ['Tempo, key & song sections', 'Click track', 'Guitar tabs', 'Bass tabs', 'Drum tabs & MIDI']) {
     await page.getByRole('checkbox', { name, exact: true }).check();
   }
-  const input = fixture();
+  const captureFixture = process.env.TRACK2STEM_CAPTURE_README === '1' && process.env.TRACK2STEM_CAPTURE_FIXTURE;
+  const input = captureFixture
+    ? { name: path.basename(captureFixture), mimeType: 'audio/wav', buffer: await fs.readFile(captureFixture) }
+    : fixture();
   const job = await submit(page, request, input);
   expect(Object.keys(job.output_files).sort()).toEqual([...stems].sort());
   for (const stem of stems) {
@@ -121,6 +124,15 @@ test('real upload, practice artifacts, boosted remix and refresh remain usable',
   const midi = await downloaded(page, page.getByRole('link', { name: 'Drum MIDI', exact: true }));
   expect(midi.buffer.toString('ascii', 0, 4)).toBe('MThd');
   expect(midi.buffer.length).toBeGreaterThan(30);
+  const bassNotes = await (await request.get(`${api()}/artifacts/${job.id}/bass_notes`)).json();
+  expect(bassNotes.selection_policy).toBe('clean monophonic bassline');
+  expect(bassNotes.raw_candidates.length).toBeGreaterThanOrEqual(bassNotes.notes.length);
+  expect(job.transcriptions.bass.selection_policy).toBe('clean monophonic bassline');
+  expect(job.transcriptions.bass.raw_candidates).toBeUndefined();
+  await expect(page.getByText(/raw polyphonic candidates/)).toBeVisible();
+  for (let index = 1; index < bassNotes.notes.length; index++) {
+    expect(bassNotes.notes[index - 1].end).toBeLessThanOrEqual(bassNotes.notes[index].start);
+  }
   const click = await request.get(`${api()}/artifacts/${job.id}/click`);
   expect(pcm(await click.body()).frames).toBe(441000);
   const before = pcm(await (await request.get(`${api()}/download/${job.id}/bass`)).body()).rms;

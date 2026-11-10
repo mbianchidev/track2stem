@@ -266,6 +266,34 @@ def drum_benchmark(output, font, models):
     return reports
 
 
+def pitched_benchmark(cases, models):
+    from track2stem_engine.transcription import assign_frets, pitched_notes
+
+    reports = []
+    for case in cases:
+        reference = json.loads((case / "reference.json").read_text())
+        expected = arrangement(reference["sections"], reference["style"])
+        for instrument in ("guitar", "bass"):
+            audio, rate = sf.read(case / f"{instrument}.wav", dtype="float32", always_2d=True)
+            details = {}
+            notes = pitched_notes(audio, rate, instrument, models, lambda *_: None, threading.Event(), details)
+            if any(not 0 <= note["start"] < note["end"] <= len(audio) / rate for note in notes):
+                raise RuntimeError("Pitched transcription produced invalid event timing")
+            assigned, tuning = assign_frets(notes, instrument)
+            invalid = [note for note in assigned if "string" in note
+                       and (note["pitch"] != tuning[-note["string"]] + note["fret"] or not 0 <= note["fret"] <= 24)]
+            report = {"case": case.name, "instrument": instrument,
+                      "scope": "rendered reference stem, not separation-plus-transcription accuracy",
+                      "raw_candidates": len(details["raw_candidates"]), "selected_notes": len(notes),
+                      "unassigned_fingerings": sum("string" not in note for note in assigned),
+                      "invalid_assigned_pitches": len(invalid), "onset_alignment": details["onset_alignment"],
+                      "raw_candidate_metrics": event_metrics(expected[instrument], details["raw_candidates"]),
+                      **event_metrics(expected[instrument], notes)}
+            reports.append(report)
+            print(json.dumps(report), flush=True)
+    return reports
+
+
 def structure_benchmark(output, font, models):
     from track2stem_engine.separation import Separator
     from track2stem_engine.settings import Settings
@@ -332,7 +360,8 @@ def main():
     parser.add_argument("--models", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--soundfont", type=Path)
-    parser.add_argument("--tasks", nargs="+", choices=("separation", "drums", "sections"), default=["separation", "drums", "sections"])
+    parser.add_argument("--tasks", nargs="+", choices=("separation", "drums", "sections", "pitched"),
+                        default=["separation", "drums", "sections", "pitched"])
     parser.add_argument("--duration", type=int, default=30)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--run-case", type=Path, help=argparse.SUPPRESS)
@@ -347,10 +376,13 @@ def main():
     report = {"scope": "generated MIDI/SoundFont corpus only; not a general song-quality guarantee",
               "font_sha256": FONT_SHA256, "font_license": FONT_LICENSE, "python": sys.version.split()[0],
               "platform": platform.system(), "architecture": platform.machine(), "available_cpus": os.process_cpu_count()}
-    if "separation" in args.tasks:
+    if {"separation", "pitched"} & set(args.tasks):
         cases = [render_song(args.output / style, [{"start": 0, "end": args.duration, "label": "Chorus"}], style, font)
                  for style in ("clean", "metal")]
+    if "separation" in args.tasks:
         report["separation"] = separation_benchmark(cases, args.output, args.models, args.repeats)
+    if "pitched" in args.tasks:
+        report["pitched"] = pitched_benchmark(cases, args.models)
     if "drums" in args.tasks:
         report["drums"] = drum_benchmark(args.output, font, args.models)
     if "sections" in args.tasks:

@@ -44,7 +44,9 @@ The processor validates numeric options and model/stem compatibility. A backend 
 
 `POST /api/jobs/{id}/mix` accepts `{"gains":{"bass":1.5,"drums":0.5}}`. Gains are linear multipliers from 0 to 4, keyed by names in `mix_stems`. Omitted instruments return to unity. Unknown names, negative/non-finite gains, and out-of-range values are rejected. The response is the updated job, with regenerated `output_files`. Original stems remain available for future remixes. Isolate mode also accepts gains for every instrument inside its backing track.
 
-Completed jobs can include `mix_stems`, `gains`, `stem_files`, `analysis`, `lyrics` and `artifacts`. Map values are internal paths, not public URLs. Download an artifact by its exact map key, for example `/api/artifacts/{id}/drums_midi`, or a preview stem through `/api/stems/{id}/bass`. Downloads support HTTP byte ranges. MusicXML, MIDI, JSON, CSV, SRT and text have explicit content types.
+Completed jobs can include `mix_stems`, `gains`, `stem_files`, `analysis`, `lyrics`, `vocal_split`, `transcriptions` and `artifacts`. Map values are internal paths, not public URLs. Download an artifact by its exact map key, for example `/api/artifacts/{id}/drums_midi`, or a preview stem through `/api/stems/{id}/bass`. Downloads support HTTP byte ranges. MusicXML, MIDI, JSON, CSV, SRT and text have explicit content types.
+
+`transcriptions` contains compact policy/evidence summaries, not dense note arrays. Bass exports use a clean monophonic line by default. `/api/artifacts/{id}/bass_notes` preserves the selected `notes`, original neural `raw_candidates`, `selection_policy`, rejected-candidate count and warnings; MIDI/MusicXML/text use the selected line. Guitar notes JSON also retains raw candidates and acoustic onset-alignment details. Existing jobs created before this metadata was introduced may omit these additive fields.
 
 The shared headless engine's settings/job/result contract is version **1**. It uses `outputs` internally; the Go web adapter retains the existing public `output_files` field.
 

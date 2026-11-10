@@ -58,6 +58,9 @@ export default function PracticeResults({ job, apiBase }) {
         </details>
       )}
       {job.vocal_split && <p className="setting-help">{job.vocal_split.warning} Weight license: {job.vocal_split.weight_license}.</p>}
+      {job.transcriptions?.bass?.selection_policy === 'clean monophonic bassline' && <p className="setting-help">
+        Bass exports prioritize one note at a time. Bass notes (JSON) also keeps the raw polyphonic candidates.
+      </p>}
       <div className="artifact-downloads">
         {artifacts.map((name) => (
           <a key={name} href={`${apiBase}/artifacts/${encodeURIComponent(job.id)}/${encodeURIComponent(name)}`} download>

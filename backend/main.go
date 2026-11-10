@@ -41,6 +41,7 @@ type Job struct {
 	Analysis       json.RawMessage    `json:"analysis,omitempty"`
 	Lyrics         json.RawMessage    `json:"lyrics,omitempty"`
 	VocalSplit     json.RawMessage    `json:"vocal_split,omitempty"`
+	Transcriptions json.RawMessage    `json:"transcriptions,omitempty"`
 	SourceURL      string             `json:"source_url,omitempty"`
 }
 
