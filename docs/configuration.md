@@ -18,6 +18,12 @@ Start with at least 8 GB of RAM available to the container runtime and several G
 | `PORT` | Processor | `5000` |
 | `FLASK_DEBUG` | Processor | `false` when unset, but **`true` in the supplied Compose file** |
 | `VITE_API_URL` | Frontend | `/api`; read by Vite at development-server startup or build time |
+| `UPLOAD_FOLDER` | Backend / processor | `/app/uploads`; shared writable upload root |
+| `OUTPUT_FOLDER` | Backend / processor | `/app/outputs`; shared writable output root |
+| `MODEL_FOLDER` | Processor | `/app/models`; named `model-cache` volume in Compose |
+| `TRACK2STEM_OFFLINE` | Engine | Set to `1` to require already-cached auxiliary models |
+| `TRACK2STEM_FFMPEG` | Engine | `ffmpeg`; an absolute executable can be injected by a packaged host |
+| `TRACK2STEM_NODE` | YouTube importer | Node.js executable override; otherwise yt-dlp discovers `node` |
 
 The Compose file hardcodes service environment values and port mappings. It does not interpolate [.env.example](../.env.example), so copying that example to `.env` alone does **not** reconfigure the stack. Change the relevant `environment` entries and port mappings in [docker-compose.yml](../docker-compose.yml), then recreate affected services.
 
@@ -41,7 +47,11 @@ The stack has no authentication, TLS termination, or rate limiting, and its Comp
 
 Demucs downloads the selected model when it is first used, not when containers become healthy. Internet access is required for uncached weights; download size and processing time depend on the model.
 
-The model cache is not mounted in a named volume. It can survive a stop/start of the same container, but recreating the processor container can require another download. Health endpoints confirm availability, not that a model is cached or inference works.
+Compose persists model downloads in the `model-cache` volume. The engine retains one selected Demucs model in memory; switching models releases that cache entry. Auxiliary CPU models are downloaded only for enabled features: Spotify Basic Pitch for pitched transcription, Whisper base for lyrics, and UVR MDX-NET KARA 2 for lead/backing vocal splitting. The ONNX downloads have pinned SHA-256 checksums. Download failures are explicit errors; local audio is never uploaded to a model service.
+
+Weights are not committed or redistributed with Track2stem and remain subject to their upstream terms. Basic Pitch is Apache-2.0; Whisper and Demucs have their own upstream licenses. The public UVR model download does not provide a clear model-specific redistribution license. Verify permission before redistributing or commercially deploying those weights; this repository's MIT license does not relicense third-party models. See the [Basic Pitch source](https://github.com/spotify/basic-pitch), [Whisper source](https://github.com/openai/whisper), and [UVR model source](https://github.com/TRvlvr/model_repo).
+
+Health endpoints confirm availability, not that a model is cached or inference works. Offline operation requires provisioning every selected model beforehand; uncached YouTube videos still require network access.
 
 ## Start, inspect, and stop
 
@@ -69,11 +79,11 @@ Stopping with `docker compose down` preserves the named audio volumes. It still 
 ## Limitations and data lifecycle
 
 - **History is not a backup.** Browser localStorage contains metadata, not the audio or a durable server job database. Backend restarts lose job records and download mappings even if files remain in volumes.
-- **Files outlive job records.** Successful processing removes its input, but completed outputs have no automatic expiration. Removing a completed job from browser history or deleting its API record does not remove output audio. Failed jobs can also leave files behind.
-- **Upload limits differ.** The browser accepts files up to 100 MiB; Nginx caps the whole multipart request at 100 MiB, including overhead. The directly exposed backend does not enforce the same hard request-size cap.
-- **CPU time varies.** There is no fixed per-song timing guarantee or managed worker queue. The Demucs subprocess has a 30-minute timeout, and the backend also times out processor requests after 30 minutes.
-- **Cancellation is best-effort.** The API requests subprocess termination and removes the job record. Work may continue before subprocess registration or during later FFmpeg conversion/mixing.
+- **Files outlive job records.** Successful processing removes its owned input. Internal lossless stems and completed outputs have no automatic expiration. Removing history or deleting an API record does not remove output audio. Failed/cancelled engine jobs clean their owned output directory.
+- **Uploads are bounded.** Individual files are limited to 100 MiB. Nginx, Go and Flask allow 101 MiB for the multipart request, including overhead. Decoded audio is limited to 60 minutes.
+- **CPU time varies.** A process-local engine serializes jobs so they do not compete for model memory. Each job can use 1-4 segment workers. This is not a durable/distributed queue. The Go adapter times out a processing request after 30 minutes.
+- **Cancellation is cooperative.** Events are checked while queued, between separation/model windows, and during FFmpeg operations. An in-flight neural-network segment must finish before the engine can clean up; download/model-loading operations can delay cancellation.
 
 Download needed stems before restarting the backend. Monitor disk use and back up audio separately if it must be retained.
 
-**Destructive reset:** `docker compose down --volumes` and `make clean` permanently remove the stack's `uploads` and `outputs` named volumes. Use them only after saving any required files. They are not routine shutdown commands.
+**Destructive reset:** `docker compose down --volumes` and `make clean` permanently remove the stack's `uploads`, `outputs` and `model-cache` named volumes. Use them only after saving any required files. They are not routine shutdown commands.

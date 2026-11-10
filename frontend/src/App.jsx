@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 import Spectrogram from './Spectrogram.jsx';
+import StemMixer from './StemMixer.jsx';
+import PracticeResults from './PracticeResults.jsx';
 
 const STORAGE_KEYS = {
   JOBS: 'track2stem_jobs',
@@ -45,10 +47,19 @@ function BrandMark() {
   );
 }
 
-const stemLabel = (stem) => stem.charAt(0).toUpperCase() + stem.slice(1);
+const stemLabel = (stem) => (stem.charAt(0).toUpperCase() + stem.slice(1)).replaceAll('_', ' ');
+const PRACTICE_TOOLS = [
+  ['analysis', 'Tempo, key & song sections'], ['click_track', 'Click track'], ['lyrics', 'Lyrics'],
+  ['guitar_tabs', 'Guitar tabs'], ['bass_tabs', 'Bass tabs'], ['drum_tabs', 'Drum tabs & MIDI'],
+  ['split_vocals', 'Lead / backing vocals'],
+];
 
 function App() {
+  const localStorage = window.track2stemHost?.storage || window.localStorage;
+  const nativeHost = Boolean(window.track2stemHost);
   const [file, setFile] = useState(null);
+  const [sourceType, setSourceType] = useState('file');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentJob, setCurrentJob] = useState(null);
@@ -73,19 +84,22 @@ function App() {
   const [overlap, setOverlap] = useState('0.25');
   const [shifts, setShifts] = useState('0');
   const [clipMode, setClipMode] = useState('rescale');
+  const [workers, setWorkers] = useState('1');
+  const [tools, setTools] = useState(Object.fromEntries(PRACTICE_TOOLS.map(([name]) => [name, false])));
 
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
   const historyHeadingRef = useRef(null);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+  const API_BASE = window.track2stemHost?.apiBase || import.meta.env.VITE_API_URL || '/api';
 
   const isSixStemModel = SIX_STEM_MODELS.includes(model);
   const availableStems = isSixStemModel ? SIX_STEMS : FOUR_STEMS;
   const expectedStems = stemMode === 'all'
-    ? availableStems
-    : [isolateStem, isolateStem === 'vocals' ? 'instrumental' : 'backing'];
+    ? (tools.split_vocals ? ['lead_vocals', 'backing_vocals', ...availableStems.slice(1)] : availableStems)
+    : [...(tools.split_vocals && isolateStem === 'vocals' ? ['lead_vocals', 'backing_vocals'] : [isolateStem]),
+      isolateStem === 'vocals' ? 'instrumental' : 'backing'];
   const currentProgress = Number.isFinite(processingProgress.progress)
     ? Math.max(0, Math.min(100, processingProgress.progress))
     : null;
@@ -254,7 +268,14 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to fetch job status:', err);
-      setStatusWarning('Could not refresh this job. Retrying automatically; check the server connection.');
+      if (err.response?.status === 404) {
+        setCurrentJob((previous) => previous?.id === jobId ? {
+          ...previous, status: 'failed',
+          error: 'This job is no longer available. The server or local worker may have restarted. Import the source again.',
+        } : previous);
+      } else {
+        setStatusWarning('Could not refresh this job. Retrying automatically; check the server connection.');
+      }
     }
   }, [API_BASE]);
 
@@ -318,17 +339,21 @@ function App() {
       setIsolateStem('vocals');
       setModelNotice('Isolation changed to vocals. Guitar and piano require the six-stem model.');
     }
+    if (!SIX_STEM_MODELS.includes(nextModel) && tools.guitar_tabs) {
+      setTools((previous) => ({ ...previous, guitar_tabs: false }));
+      setModelNotice('Guitar tabs disabled. Guitar transcription requires the six-stem model.');
+    }
   };
 
   const handleUpload = async (event) => {
     event.preventDefault();
-    if (!file) {
-      setError('Please select a file');
+    if (sourceType === 'file' ? !file : !youtubeUrl.trim()) {
+      setError(sourceType === 'file' ? 'Please select a file' : 'Please enter a YouTube video URL');
       return;
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    if (sourceType === 'file') formData.append('file', file);
     formData.append('stem_mode', stemMode);
     formData.append('isolate_stem', isolateStem);
     formData.append('output_format', outputFormat);
@@ -341,6 +366,10 @@ function App() {
     if (overlap) {
       formData.append('overlap', overlap);
     }
+    formData.append('workers', workers);
+    for (const [name, enabled] of Object.entries(tools)) {
+      if (enabled) formData.append(name, 'true');
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -349,7 +378,7 @@ function App() {
     setProgressWarning('');
     
     // Save input file name to localStorage
-    localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, file.name);
+    localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, sourceType === 'file' ? file.name : 'YouTube audio');
     
     // Reset timer for new job
     startTimeRef.current = Date.now();
@@ -361,7 +390,12 @@ function App() {
     localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify({ progress: 0, stage: 'Starting...' }));
 
     try {
-      const response = await axios.post(`${API_BASE}/upload`, formData, {
+      const response = sourceType === 'youtube'
+        ? await axios.post(`${API_BASE}/import`, {
+          url: youtubeUrl.trim(),
+          settings: Object.fromEntries([...formData.entries()].filter(([name]) => name !== 'file')),
+        })
+        : await axios.post(`${API_BASE}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -371,7 +405,7 @@ function App() {
             : null;
           setUploadProgress(percentCompleted);
         },
-      });
+        });
       
       setCurrentJob(response.data);
       setFile(null);
@@ -390,7 +424,7 @@ function App() {
         message = typeof data === 'string' ? data : data?.error || err.message || 'The request could not be completed.';
       }
 
-      setError('Upload failed: ' + message);
+      setError((sourceType === 'youtube' ? 'Import failed: ' : 'Upload failed: ') + message);
     } finally {
       setUploading(false);
     }
@@ -460,6 +494,11 @@ function App() {
     return `${API_BASE}/download/${jobId}/${stem}`;
   };
 
+  const updateMixedJob = (job) => {
+    setCurrentJob(job);
+    setJobs((previous) => [...previous.filter((entry) => entry.id !== job.id), job]);
+  };
+
   return (
     <div className="App">
       <a className="skip-link" href="#main-content">Skip to workspace</a>
@@ -470,7 +509,7 @@ function App() {
             <span>Track2stem</span>
           </a>
           <div className="header-links">
-            <span className="host-label">Self-hosted audio separation</span>
+            <span className="host-label">{nativeHost ? 'Local DAW workspace' : 'Self-hosted audio separation'}</span>
             <a href="https://github.com/mbianchidev/track2stem/blob/main/docs/usage.md" target="_blank" rel="noreferrer">
               Usage guide <Icon name="arrow" />
             </a>
@@ -493,7 +532,20 @@ function App() {
               <h2 id="source-heading"><Icon name="file" /> Source audio</h2>
               <span className="panel-label">Input</span>
             </div>
-            <div className={`source-picker ${file ? 'has-file' : ''}`}>
+            <fieldset className="source-type" disabled={uploading}>
+              <legend className="sr-only">Source type</legend>
+              <label><input type="radio" name="sourceType" checked={sourceType === 'file'} onChange={() => { setSourceType('file'); setError(''); }} /> Audio file</label>
+              <label><input type="radio" name="sourceType" checked={sourceType === 'youtube'} onChange={() => { setSourceType('youtube'); setError(''); }} /> YouTube link</label>
+            </fieldset>
+            {sourceType === 'youtube' ? (
+              <div className="youtube-source">
+                <label className="setting-label" htmlFor="youtube-url">YouTube video URL</label>
+                <input id="youtube-url" form="separation-form" type="url" required value={youtubeUrl}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  onChange={(event) => setYoutubeUrl(event.target.value)} disabled={uploading} />
+                <p className="setting-help">Single videos up to 60 minutes and 100 MiB. Import only audio you have permission to use. Restricted videos may require a local file instead.</p>
+              </div>
+            ) : <><div className={`source-picker ${file ? 'has-file' : ''}`}>
               <input
                 ref={fileInputRef}
                 id="file-input"
@@ -525,7 +577,7 @@ function App() {
               <div className="source-waveform">
                 <Spectrogram audioFile={file} title="Source waveform" height={88} />
               </div>
-            )}
+            )}</>}
             {uploading && (
               <div className="upload-progress">
                 <div className="progress-caption">
@@ -538,7 +590,7 @@ function App() {
             {error && <p className="error source-error" role="alert" id="source-error">{error}</p>}
           </section>
 
-          <form className="panel settings-panel" aria-labelledby="settings-heading" onSubmit={handleUpload} aria-busy={uploading}>
+          <form id="separation-form" className="panel settings-panel" aria-labelledby="settings-heading" onSubmit={handleUpload} aria-busy={uploading}>
             <div className="panel-header">
               <h2 id="settings-heading"><Icon name="settings" /> Separation settings</h2>
             </div>
@@ -602,6 +654,28 @@ function App() {
                   ? <p className="setting-help model-notice" role="status">{modelNotice}</p>
                   : <p className="setting-help">{isSixStemModel ? 'Includes separate guitar and piano tracks.' : 'Vocals, drums, bass, and other instruments.'}</p>}
               </div>
+              <div className="setting-group">
+                <label className="setting-label" htmlFor="profile-select">CPU profile</label>
+                <select id="profile-select" defaultValue="custom" disabled={uploading} onChange={(event) => {
+                  if (event.target.value === 'fast') {
+                    handleModelChange({ target: { value: 'htdemucs' } });
+                    setOverlap('0.1');
+                    setShifts('0');
+                    setSegment('');
+                    setModelNotice('Fast profile: four instruments, no shift passes, and less overlap. Use six-stem defaults for separate guitar and piano.');
+                  } else if (event.target.value === 'six') {
+                    setModel('htdemucs_6s');
+                    setOverlap('0.25');
+                    setShifts('0');
+                    setSegment('');
+                    setModelNotice('');
+                  }
+                }}>
+                  <option value="custom">Custom settings</option>
+                  <option value="six">Six-stem defaults</option>
+                  <option value="fast">Fast / four stems</option>
+                </select>
+              </div>
 
               <fieldset className="settings-fieldset" disabled={uploading}>
                 <legend className="setting-label">Output format</legend>
@@ -618,6 +692,17 @@ function App() {
                   {outputFormat === 'mp3' ? '320 kbps' : outputFormat === 'wav' ? 'Uncompressed audio' : 'Lossless compression'}
                 </p>
               </fieldset>
+              <fieldset className="settings-fieldset practice-options" disabled={uploading}>
+                <legend className="setting-label">Practice tools</legend>
+                {PRACTICE_TOOLS.map(([name, text]) => (
+                  <label key={name}>
+                    <input type="checkbox" checked={tools[name]} disabled={uploading || (name === 'guitar_tabs' && !isSixStemModel)}
+                      onChange={(event) => setTools((previous) => ({ ...previous, [name]: event.target.checked }))} />
+                    {text}
+                  </label>
+                ))}
+                <p className="setting-help">Optional local processing. Lyrics, tabs and vocal splitting download extra models on first use. Automatic transcriptions need review.</p>
+              </fieldset>
 
               <div className="advanced-section">
                 <button type="button" className="advanced-toggle" aria-expanded={showAdvanced}
@@ -629,10 +714,20 @@ function App() {
                   {showAdvanced && (
                     <div className="advanced-options-panel">
                       <div className="setting-group">
+                        <label className="setting-label" htmlFor="workers-select">Parallel CPU workers</label>
+                        <select id="workers-select" value={workers} onChange={(event) => setWorkers(event.target.value)} disabled={uploading}>
+                          {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}{count === 1 ? ' / low memory' : ' / more memory'}</option>)}
+                        </select>
+                        <p className="setting-help">Workers share one model and crossfade overlapping segments. Start with one on memory-limited hosts.</p>
+                      </div>
+                      <div className="setting-group">
                         <label className="setting-label" htmlFor="segment-select">Segment size</label>
                         <select id="segment-select" value={segment} onChange={(e) => setSegment(e.target.value)} disabled={uploading}>
                           <option value="">Default</option>
-                          <option value="8">8 s (low memory)</option>
+                          <option value="5">5 s (low memory)</option>
+                          <option value="7">7 s</option>
+                          {!model.startsWith('htdemucs') && <option value="8">8 s</option>}
+                          {!model.startsWith('htdemucs') && <>
                           <option value="10">10 s</option>
                           <option value="15">15 s</option>
                           <option value="20">20 s</option>
@@ -640,6 +735,7 @@ function App() {
                           <option value="30">30 s</option>
                           <option value="40">40 s</option>
                           <option value="60">60 s (high memory)</option>
+                          </>}
                         </select>
                       </div>
 
@@ -683,11 +779,11 @@ function App() {
               </div>
 
               <div className="settings-action">
-                <button type="submit" disabled={!file || uploading} className="upload-button">
-                  {uploading ? `Uploading...${uploadProgress === null ? '' : ` ${uploadProgress}%`}` : 'Upload & Process'}
+                <button type="submit" disabled={(sourceType === 'file' ? !file : !youtubeUrl.trim()) || uploading} className="upload-button">
+                  {uploading ? `Uploading...${uploadProgress === null ? '' : ` ${uploadProgress}%`}` : sourceType === 'youtube' ? 'Import & Process' : 'Upload & Process'}
                   <Icon name="arrow" />
                 </button>
-                <p className="setting-footnote">Processing runs on your server's CPU.</p>
+                <p className="setting-footnote">{nativeHost ? 'Processing stays on this Mac.' : "Processing runs on your server's CPU."}</p>
               </div>
             </div>
           </form>
@@ -751,12 +847,13 @@ function App() {
                         <span>Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</span>
                       )}
                     </p>
+                    {currentJob.mix_stems?.length > 0 && <StemMixer key={currentJob.id} job={currentJob} apiBase={API_BASE} onJobChange={updateMixedJob} />}
                     <div className="stem-lanes">
                       {Object.keys(currentJob.output_files).map((stem) => (
                         <div className="stem-lane" key={stem}>
                           <h3 className="stem-name">{stemLabel(stem)}</h3>
                           <div className="stem-waveform">
-                            <Spectrogram audioUrl={getDownloadUrl(currentJob.id, stem)} label={`${stemLabel(stem)} waveform`} height={52} />
+                            <Spectrogram audioUrl={`${getDownloadUrl(currentJob.id, stem)}?v=${encodeURIComponent(currentJob.output_files[stem])}`} label={`${stemLabel(stem)} waveform`} height={52} />
                           </div>
                           <button type="button" className="download-button" aria-label={`Download ${stem}`} onClick={() => handleDownload(currentJob.id, stem)}>
                             <Icon name="download" /> Download
@@ -764,6 +861,7 @@ function App() {
                         </div>
                       ))}
                     </div>
+                    <PracticeResults job={currentJob} apiBase={API_BASE} />
                   </>
                 )}
                 {currentJob.status === 'failed' && <p className="error" role="alert">Separation failed: {currentJob.error}</p>}

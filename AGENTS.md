@@ -6,7 +6,7 @@ Read the [development guide](docs/development.md) for architecture, toolchains, 
 
 - `frontend/`: React with Vite, browser localStorage metadata, upload settings, progress polling, waveforms, and stem downloads.
 - `backend/`: Go with Gorilla Mux, in-memory job management, uploads, processor requests, and downloads.
-- `processor/`: Python/Flask with Demucs and FFmpeg. The default `htdemucs_6s` model produces vocals, drums, bass, guitar, piano, and other.
+- `processor/`: Flask adapter and `track2stem_engine/`, shared local CPU processing with Demucs, FFmpeg and optional practice models. The default `htdemucs_6s` model produces vocals, drums, bass, guitar, piano, and other.
 - `scripts/health-check.sh`: Compose service availability check.
 
 ## Setup and checks
@@ -39,7 +39,7 @@ go build ./...
 go test -race -timeout=5m ./...
 ```
 
-For processor validation tests, use the isolated setup and command in the [processor test guide](docs/development.md#processor-tests). Native processor execution requires POSIX pseudo-terminals and shared writable `/app` paths.
+For processor tests, use the isolated setup and command in the [processor test guide](docs/development.md#processor-tests). Inject storage/model paths for native engine execution; native web adapters need matching upload/output roots.
 
 ## Behavioral invariants
 
@@ -47,7 +47,7 @@ For processor validation tests, use the isolated setup and command in the [proce
 - The component named `Spectrogram` draws amplitude waveforms through the Web Audio API.
 - All-stems mode produces six stems with `htdemucs_6s` or four with the other supported models. Isolate mode mixes the remaining stems into `instrumental` for vocals, or `backing` otherwise.
 - Output formats are MP3 at 320 kbps, WAV, and FLAC.
-- The supplied processor is CPU-only. Application-level segment splitting and parallel workers remain [future work](docs/roadmap.md#parallel-separation).
+- The supplied processor is CPU-only. Bounded segment workers share one cached model and use normalized overlap-add. More workers consume more memory.
 
 ## Change guidelines
 

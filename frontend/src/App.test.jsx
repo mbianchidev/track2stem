@@ -172,7 +172,7 @@ describe('App', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(document.getElementById(toggle.getAttribute('aria-controls'))).toBeVisible();
-    fireEvent.change(screen.getByLabelText('Segment size'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Segment size'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('Overlap'), { target: { value: '0.5' } });
     fireEvent.change(screen.getByLabelText('Shifts (quality)'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Clip mode'), { target: { value: 'clamp' } });
@@ -183,7 +183,7 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Choose stem to isolate'), { target: { value: 'drums' } });
     chooseFile();
     const formData = await uploadFile();
-    expect(formData.get('segment')).toBe('8');
+    expect(formData.get('segment')).toBe('7');
     expect(formData.get('overlap')).toBe('0.5');
     expect(formData.get('shifts')).toBe('2');
     expect(formData.get('clip_mode')).toBe('clamp');
@@ -348,5 +348,54 @@ describe('App', () => {
     await act(async () => vi.advanceTimersByTimeAsync(2000));
     expect(screen.queryByText(message)).not.toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Separation progress' })).toHaveAttribute('value', '12');
+  });
+
+  test('submits local practice tools and bounded parallel workers', async () => {
+    await renderApp();
+    chooseFile();
+    for (const name of ['Tempo, key & song sections', 'Click track', 'Lyrics', 'Guitar tabs', 'Bass tabs', 'Drum tabs & MIDI', 'Lead / backing vocals']) {
+      fireEvent.click(screen.getByRole('checkbox', { name }));
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Advanced tuning/i }));
+    fireEvent.change(screen.getByLabelText('Parallel CPU workers'), { target: { value: '2' } });
+    const formData = await uploadFile();
+    for (const name of ['analysis', 'click_track', 'lyrics', 'guitar_tabs', 'bass_tabs', 'drum_tabs', 'split_vocals']) {
+      expect(formData.get(name)).toBe('true');
+    }
+    expect(formData.get('workers')).toBe('2');
+  });
+
+  test('imports a YouTube video without requiring a local file', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('radio', { name: 'YouTube link' }));
+    fireEvent.change(screen.getByLabelText('YouTube video URL'), { target: { value: 'https://youtu.be/abcdefghijk' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Import & Process' })));
+    expect(axios.post).toHaveBeenCalledWith('/api/import', expect.objectContaining({
+      url: 'https://youtu.be/abcdefghijk',
+      settings: expect.objectContaining({ model: 'htdemucs_6s', output_format: 'mp3' }),
+    }));
+  });
+
+  test('remixes original backing instruments above unity and exposes practice exports', async () => {
+    const job = makeJob({
+      status: 'completed', stem_mode: 'isolate', isolate_stem: 'vocals',
+      output_files: { vocals: '/synthetic/vocals.wav', instrumental: '/synthetic/instrumental.wav' },
+      mix_stems: ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'],
+      artifacts: { drums_midi: '/synthetic/drums.mid', guitar_score: '/synthetic/guitar.musicxml' },
+      analysis: { bpm: 120, key: { name: 'D minor', confidence: .7 }, sections: [] },
+    });
+    savedState.set('track2stem_current_job', JSON.stringify(job));
+    axios.post.mockResolvedValue({ data: { ...job, gains: { bass: 1.75 } } });
+    await renderApp();
+    const bass = screen.getByLabelText('Bass volume');
+    expect(bass).toHaveValue('100');
+    fireEvent.change(bass, { target: { value: '175' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Export mix' })));
+    expect(axios.post).toHaveBeenCalledWith('/api/jobs/synthetic-job/mix', {
+      gains: expect.objectContaining({ bass: 1.75, vocals: 1, drums: 1 }),
+    });
+    expect(screen.getByRole('link', { name: 'Drum MIDI' })).toHaveAttribute('href', '/api/artifacts/synthetic-job/drums_midi');
+    expect(screen.getByRole('link', { name: 'Guitar score (MusicXML)' })).toBeInTheDocument();
+    expect(screen.getByText('D minor')).toBeInTheDocument();
   });
 });

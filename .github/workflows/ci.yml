@@ -97,10 +97,13 @@ jobs:
           python-version: '3.14.9'
 
       - name: Install test dependencies
-        run: pip install flask werkzeug pytest
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+          pip install -r requirements-test.txt
 
       - name: Run tests
-        run: python -m pytest test_app.py -v
+        run: python -m pytest -q
 
   docker:
     name: Docker Compose Validation & Build

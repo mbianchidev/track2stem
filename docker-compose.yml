@@ -45,6 +45,7 @@ services:
     volumes:
       - uploads:/app/uploads
       - outputs:/app/outputs
+      - model-cache:/app/models
     environment:
       - PORT=5000
       - FLASK_DEBUG=true
@@ -60,6 +61,7 @@ services:
 volumes:
   uploads:
   outputs:
+  model-cache:
 
 networks:
   track2stem-network:

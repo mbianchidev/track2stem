@@ -10,7 +10,7 @@ The frontend already uses stable React and React DOM 19.3.1. Processor interpret
 
 The processor Dockerfile installs PyTorch, Torchaudio, and TorchCodec together from PyTorch's CPU wheel index before the remaining requirements. Do not replace TorchCodec with its default PyPI wheel, which can require CUDA libraries. The image build checks dependency consistency and imports the audio stack, failing immediately if CPU-only imports are broken.
 
-Use the [Compose quickstart](../README.md#quickstart) for the full stack. Full native backend/processor execution is not turnkey: both use writable, shared `/app/uploads` and `/app/outputs` paths, and the processor uses POSIX pseudo-terminals. Use Linux containers rather than native Windows Python.
+Use the [Compose quickstart](../README.md#quickstart) for the full web stack. Native web execution requires matching writable `UPLOAD_FOLDER` and `OUTPUT_FOLDER` values in Go and Flask, plus `MODEL_FOLDER` for cached weights. The headless engine does not import Flask or depend on `/app`, pseudo-terminals, or a browser.
 
 ## Python upgrade gate
 
@@ -88,17 +88,17 @@ Follow Go formatting (`gofmt`) and existing handler/helper conventions. The API 
 
 ## Processor tests
 
-For validation tests only, install the same small dependency set used by CI. Demucs and model downloads are not needed for these tests:
+For deterministic engine/web tests, install the same dependency set used by CI. FFmpeg and libsndfile are required. Demucs, Whisper, ONNX Runtime and model downloads are not needed for this suite; model boundaries are injected in unit tests:
 
 ```bash
 cd processor
 python3.14 -m venv .venv
 . .venv/bin/activate
-python -m pip install flask werkzeug pytest
-python -m pytest test_app.py -v
+python -m pip install -r requirements-test.txt
+python -m pytest -q
 ```
 
-The processor tests cover input validation, path safety, and model/stem allowlists. `conftest.py` patches directory creation during import and redirects test folders to temporary storage. The tests do not mock or exercise separation subprocesses, downloads, conversion, or output audio quality.
+The tests cover validation/path safety, real FFmpeg exports and per-instrument remixes, variable-tempo synthetic clicks, complementary vocal windows, note re-attacks, MusicXML/MIDI timing, lyrics/subtitles, safe video imports and the Flask adapter. `conftest.py` redirects web storage to temporary directories. Mocked model outputs do not establish separation/transcription quality or native runtime compatibility; real inference remains a separate requirement.
 
 ## Container and integration checks
 
@@ -129,11 +129,13 @@ The component `.dockerignore` files exclude local dependencies, build outputs, a
 |------|----------------|----------------|
 | [frontend/](../frontend/) | React 19, Vite, Nginx | Upload settings, status polling, localStorage history, waveforms, and download controls |
 | [backend/](../backend/) | Go, Gorilla Mux | Job records, multipart uploads, processor requests, and streaming downloads |
-| [processor/](../processor/) | Python 3.14, Flask, Demucs 4.0.1, FFmpeg | Separation subprocesses, progress parsing, cancellation, FLAC conversion, and backing mixes |
+| [processor/](../processor/) | Python 3.14, Flask adapter, shared headless engine, Demucs 4.0.1, FFmpeg | Cached CPU inference, overlap-add workers, progress/cancellation, mixes, analysis and transcription |
 | [scripts/](../scripts/) | Shell | Stack health check |
 | [.github/workflows/](../.github/workflows/) | GitHub Actions | CI and CodeQL |
 
-The upload flow is browser -> backend -> processor. The backend assigns a job ID and returns a job record while processing continues in a goroutine. The processor runs Demucs, arranges outputs by job, and returns their paths; the backend records completion and serves downloads.
+The upload flow is browser -> backend -> Flask adapter -> `track2stem_engine.Engine`. The backend assigns a job ID and streams audio to the processor while processing continues in a goroutine. The engine owns settings validation, storage, cached CPU inference, progress/cancellation, exports, mixes and optional practice tools. The Go adapter retains its public API and serves audio/artifacts using allowlisted job mappings.
+
+The headless settings/job/result contract is version 1. Engine construction injects output/model locations; callers retain ownership of source files. Each job keeps a manifest and float WAV source stems for remixes. A bounded worker pool shares one loaded model and reassembles overlapping windows using normalized triangular weights. Zero shifts is explicit rather than the Demucs CLI's implicit augmentation default.
 
 Backend and processor share `uploads` and `outputs` volumes at `/app/uploads` and `/app/outputs`. Only audio files persist there; backend jobs and processor progress live in memory. The frontend polls every two seconds and separately persists UI metadata in localStorage.
 
