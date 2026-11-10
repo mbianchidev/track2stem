@@ -1,16 +1,12 @@
 <img src="frontend/public/logo.svg" width="360" height="80" alt="Track2stem audio stem routing logo">
 
-# Track2stem
-
 [![CI](https://github.com/mbianchidev/track2stem/actions/workflows/ci.yml/badge.svg)](https://github.com/mbianchidev/track2stem/actions/workflows/ci.yml)
+
+Track2stem is a self-hosted web application for musicians and audio enthusiasts who want separate vocal and instrument tracks for practice, remixing, or transcription. Upload audio, choose a Demucs model, and download all available stems or one isolated instrument with a backing track.
 
 [Documentation](docs/README.md) | [DAW plugin](docs/native-plugin.md) | [Report a bug](https://github.com/mbianchidev/track2stem/issues) | [Roadmap](docs/roadmap.md)
 
 ![Track2stem studio workspace with a generated source waveform, separation settings, and output area](docs/images/track2stem.png)
-
-*A generated WAV processed locally, with real stem waveforms, instrument levels, and practice-tool exports. No personal audio or fabricated results.*
-
-Track2stem is a self-hosted web application for musicians and audio enthusiasts who want separate vocal and instrument tracks for practice, remixing, or transcription. Upload audio, choose a Demucs model, and download all available stems or one isolated instrument with a backing track.
 
 ## Contents
 
