@@ -76,4 +76,6 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contr
 
 ## License
 
-Track2stem is licensed under the [MIT License](LICENSE). It builds on Demucs, originally developed by Facebook Research; the [upstream repository](https://github.com/facebookresearch/demucs) is archived.
+Track2stem's own code is licensed under the [MIT License](LICENSE). Drum transcription invokes a separately licensed [CC-BY-SA-4.0 component](processor/drum_transcriber/LICENSE); third-party code and weights retain their original terms. See [model licenses](docs/configuration.md#model-downloads).
+
+It builds on Demucs, originally developed by Facebook Research; the [upstream repository](https://github.com/facebookresearch/demucs) is archived.

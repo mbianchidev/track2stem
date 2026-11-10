@@ -50,3 +50,23 @@ def test_repeated_attacks_do_not_discard_a_sustained_pitch(tmp_path, monkeypatch
                           tmp_path, lambda *_args: None, threading.Event())
     assert len(notes) == 2
     assert all(note["pitch"] == 64 and note["end"] - note["start"] > .2 for note in notes)
+
+
+def test_full_kit_musicxml_and_midi_preserve_distinct_drum_instruments(tmp_path):
+    pitches = [36, 38, 42, 46, 41, 47, 50, 49, 51]
+    notes = [{"start": index * .25, "end": index * .25 + .1, "pitch": pitch, "velocity": 100}
+             for index, pitch in enumerate(pitches)]
+    artifacts = write_transcription(notes, "drums", tmp_path, meters=[])
+    score = ET.parse(artifacts["drums_score"])
+    declared = {item.attrib["id"]: int(item.findtext("midi-unpitched")) - 1
+                for item in score.findall(".//midi-instrument")}
+    assert declared == {f"D{pitch}": pitch for pitch in pitches}
+    instrument_notes = [item for item in score.findall(".//note") if item.find("instrument") is not None]
+    assert {item.find("instrument").attrib["id"] for item in instrument_notes} == set(declared)
+    open_hat = next(item for item in instrument_notes if item.find("instrument").attrib["id"] == "D46")
+    assert open_hat.findtext("notehead") == "circle-x"
+    hits = [message.note for message in mido.MidiFile(artifacts["drums_midi"]).tracks[0]
+            if message.type == "note_on" and message.velocity > 0]
+    assert hits == pitches
+    text = Path(artifacts["drums_tabs"]).read_text()
+    assert all(name in text for name in ("Open hi-hat", "Low tom", "Mid tom", "High tom", "Crash", "Ride"))

@@ -100,6 +100,8 @@ Native debugging can override `TRACK2STEM_WORKER`, `TRACK2STEM_DATA_DIR` and `TR
 
 Track2stem's own code remains MIT. iPlug2 uses a zlib-like license; its WebView component and the VST3 SDK are MIT. Their original notices and the applied patch remain part of the build/package evidence.
 
+Full-kit drum transcription calls the separately licensed ADT_STR CPU component through a subprocess/JSON boundary. That component and its downloaded weights retain CC-BY-SA-4.0. The native package includes the adapted component source, attribution and license; model weights remain first-use downloads. This is a separate licensing obligation, not a claim that Track2stem's MIT license relicenses the component.
+
 The distribution includes separate notices for Python dependencies, Node.js, CPython, and the fonts. FFmpeg is built with GPL and nonfree components disabled, using LGPL LAME and a source-built PyAV. Corresponding FFmpeg/LAME/PyAV source archives, checksums and build instructions accompany the package. The LGPL libraries remain replaceable; rebuilding modified binaries may require local ad-hoc signing.
 
 Model weights are fetched separately under upstream terms. In particular, the UVR karaoke download lacks a clear model-specific redistribution license. Do not redistribute those weights or claim that this repository's MIT license grants commercial model rights. See [model downloads](configuration.md#model-downloads).

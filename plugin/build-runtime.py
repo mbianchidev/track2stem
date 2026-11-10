@@ -155,11 +155,14 @@ def main():
     sources.mkdir(exist_ok=True)
     for name in ("ffmpeg", "lame", "pyav"):
         shutil.copy2(build / "downloads" / pins[name]["archive"], sources)
+    shutil.copytree(ROOT / "processor/drum_transcriber", sources / "ADT_STR_CPU",
+                    dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(PLUGIN / "native-dependencies.json", sources)
     shutil.copy2(PLUGIN / "build-runtime.py", sources)
     notices = build / "runtime-dist/Notices"
     notices.mkdir(exist_ok=True)
     shutil.copy2(node / "LICENSE", notices / "Node-LICENSE.txt")
+    shutil.copy2(ROOT / "processor/drum_transcriber/LICENSE", notices / "ADT_STR-CPU-CC-BY-SA-4.0.txt")
     for location in ("licenses", "share/licenses"):
         if (standalone / location).is_dir():
             shutil.copytree(standalone / location, notices / "Python-runtime", dirs_exist_ok=True)

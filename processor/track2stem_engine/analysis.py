@@ -5,6 +5,7 @@ import numpy as np
 from scipy.signal import find_peaks
 
 from .audio import check_cancelled
+from .tuning import estimate_tuning
 
 logger = logging.getLogger(__name__)
 HOP = 256
@@ -31,41 +32,6 @@ def estimate_key(chroma):
         "confidence": round(max(0, min(1, best)) * max(0, min(1, (best - scores[1][0]) * 5)), 3),
         "method": "chroma profile correlation; estimate, not a score annotation",
     }
-
-
-def estimate_tuning(stems, rate):
-    results = {}
-    for name in ("guitar", "bass"):
-        if name not in stems:
-            continue
-        audio = stems[name][:rate * 90].mean(axis=1)
-        if np.max(np.abs(audio), initial=0) < .001:
-            results[name] = {"candidate": None, "confidence": 0, "reason": "Not enough audible pitched audio"}
-            continue
-        mono = librosa.resample(audio, orig_sr=rate, target_sr=RATE)
-        pitch = librosa.yin(mono, sr=RATE, fmin=30 if name == "bass" else 55, fmax=400, hop_length=HOP)
-        rms = librosa.feature.rms(y=mono, hop_length=HOP)[0]
-        audible = rms > max(.003, float(np.max(rms)) * .15)
-        midi = librosa.hz_to_midi(pitch[:len(rms)][audible])
-        if len(midi) < 5:
-            results[name] = {"candidate": None, "confidence": 0, "reason": "Too few stable pitched frames"}
-            continue
-        stable = midi[np.abs(midi - np.round(midi)) < .2]
-        if len(stable) < 5:
-            results[name] = {"candidate": None, "confidence": 0, "reason": "Pitches are not stable enough"}
-            continue
-        lowest = int(round(float(np.quantile(stable, .05))))
-        standard = 28 if name == "bass" else 40
-        drop = lowest < standard and lowest % 12 != standard % 12
-        note = librosa.midi_to_note(lowest, unicode=False)
-        results[name] = {
-            "lowest_note": note,
-            "candidate": f"Possible drop {PITCH_NAMES[lowest % 12]}" if drop else None,
-            "confidence": round(min(.6, len(stable) / len(midi) * .6), 3) if drop else 0,
-            "reason": "Lowest-note evidence only; tuning cannot be uniquely identified from a recording",
-            "analyzed_seconds": min(90, len(audio) / rate),
-        }
-    return results
 
 
 def recognize_sections(mono, rate, chroma, stems):
@@ -119,7 +85,7 @@ def recognize_sections(mono, rate, chroma, stems):
     return result
 
 
-def analyze(audio, sample_rate, stems=None, cancelled=None):
+def analyze(audio, sample_rate, stems=None, cancelled=None, model_dir=None, report=None):
     if cancelled:
         check_cancelled(cancelled)
     if audio.ndim != 2 or not audio.size or not np.isfinite(audio).all():
@@ -127,17 +93,26 @@ def analyze(audio, sample_rate, stems=None, cancelled=None):
     mono = librosa.resample(audio.mean(axis=1), orig_sr=sample_rate, target_sr=RATE)
     if np.max(np.abs(mono)) < 1e-6:
         raise ValueError("Cannot analyze silent audio")
-    onset = librosa.onset.onset_strength(y=mono, sr=RATE, hop_length=HOP)
-    tempos = librosa.feature.tempo(onset_envelope=onset, sr=RATE, hop_length=HOP,
-                                  aggregate=None, ac_size=6, max_tempo=240)
-    _, beat_frames = librosa.beat.beat_track(onset_envelope=onset, sr=RATE, hop_length=HOP,
-                                           bpm=tempos, trim=False)
-    beats = librosa.frames_to_time(beat_frames, sr=RATE, hop_length=HOP)
-    beats = beats[beats < len(mono) / RATE]
-    if len(beats) < 2:
-        raise ValueError("No reliable beat grid found; try a recording with a clearer pulse")
-    changes = [{"time": round(float(index * HOP / RATE), 3), "bpm": round(float(tempos[index]), 2)}
-               for index in range(0, len(tempos), max(1, round(2 * RATE / HOP)))]
+    if model_dir is not None:
+        from .rhythm import detect_rhythm
+        rhythm = detect_rhythm(audio, sample_rate, model_dir, report or (lambda *_: None), cancelled)
+    else:
+        onset = librosa.onset.onset_strength(y=mono, sr=RATE, hop_length=HOP)
+        tempos = librosa.feature.tempo(onset_envelope=onset, sr=RATE, hop_length=HOP,
+                                      aggregate=None, ac_size=6, max_tempo=240)
+        _, beat_frames = librosa.beat.beat_track(onset_envelope=onset, sr=RATE, hop_length=HOP,
+                                               bpm=tempos, trim=False)
+        beats = librosa.frames_to_time(beat_frames, sr=RATE, hop_length=HOP)
+        beats = beats[beats < len(mono) / RATE]
+        if len(beats) < 2:
+            raise ValueError("No reliable beat grid found; try a recording with a clearer pulse")
+        rhythm = {
+            "bpm": round(float(np.median(tempos)), 2),
+            "tempo_changes": [{"time": round(float(index * HOP / RATE), 3), "bpm": round(float(tempos[index]), 2)}
+                              for index in range(0, len(tempos), max(1, round(2 * RATE / HOP)))],
+            "beats": [round(float(beat), 6) for beat in beats], "meter_changes": [], "downbeats": [],
+            "rhythm_model": "spectral pulse analysis; no meter inference requested",
+        }
     if cancelled:
         check_cancelled(cancelled)
     chroma = librosa.feature.chroma_stft(y=mono, sr=RATE, hop_length=HOP, n_fft=4096)
@@ -147,28 +122,30 @@ def analyze(audio, sample_rate, stems=None, cancelled=None):
     }
     return {
         "duration": round(len(audio) / sample_rate, 3),
-        "bpm": round(float(np.median(tempos)), 2),
-        "tempo_changes": changes, "beats": [round(float(beat), 6) for beat in beats],
+        **rhythm,
         "key": estimate_key(chroma),
-        "tuning": estimate_tuning(stems or {}, sample_rate),
+        "tuning": estimate_tuning(stems or {}, sample_rate, cancelled),
         "sections": recognize_sections(mono, RATE, chroma, resampled_stems),
         "notes": [
+            *rhythm.get("notes", []),
             "Tempo and key are estimates; half/double-tempo ambiguity is possible.",
             "Section names use repetition, energy and stem activity, not semantic certainty.",
-            "Click accents assume 4/4; beat positions follow the detected tempo changes.",
+            "Click accents follow detected downbeats; uncertain meter is left unmetered.",
         ],
     }
 
 
-def make_click_track(beats, frames, sample_rate):
+def make_click_track(beats, frames, sample_rate, downbeats=None):
     result = np.zeros((frames, 2), dtype=np.float32)
     count = max(1, round(.035 * sample_rate))
     time = np.arange(count) / sample_rate
-    for index, beat in enumerate(beats):
+    downbeats = np.asarray(downbeats if downbeats is not None else [], dtype=float)
+    for beat in beats:
         start = round(beat * sample_rate)
         if not 0 <= start < frames:
             continue
-        click = .65 * np.sin(2 * np.pi * (1800 if index % 4 == 0 else 1200) * time) * np.exp(-time * 120)
+        accented = bool(len(downbeats) and np.min(np.abs(downbeats - beat)) < .06)
+        click = .65 * np.sin(2 * np.pi * (1800 if accented else 1200) * time) * np.exp(-time * 120)
         length = min(count, frames - start)
         result[start:start + length] += click[:length, None]
     return np.clip(result, -1, 1)

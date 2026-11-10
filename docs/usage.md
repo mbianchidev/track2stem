@@ -39,14 +39,16 @@ Enable only the tools needed before processing. Everything runs locally on CPU; 
 
 | Tool | Output and limitations |
 |------|------------------------|
-| Tempo, key & song sections | Time-varying beat grid, tempo CSV, key estimate, possible drop-tuning evidence from guitar/bass, and timed section estimates. Section labels use repetition, energy and stem activity, not semantic certainty. |
-| Click track | Stereo WAV click following the detected beat grid, including tempo changes. Accents assume 4/4; half/double-tempo ambiguity is possible. |
-| Lyrics | Whisper base transcription of the vocal stem, with text, SRT subtitles and word-timing JSON. Singing and overlapping vocals can reduce accuracy; instrumental audio may produce no words. |
+| Tempo, key & song sections | Neural beat/downbeat tracking, tempo and meter CSVs, key estimate, whole-track guitar/bass tuning candidates, and timed section estimates. Section labels use repetition, energy and stem activity, not semantic certainty. |
+| Click track | Stereo WAV click following the detected beat grid and downbeats, including tempo and meter changes. Unknown meter produces unaccented clicks, not a forced four-beat pattern. Half/double-tempo and denominator ambiguity remain possible. |
+| Lyrics | Whisper large-v3-turbo CPU transcription of the vocal stem, with text, SRT subtitles and word-timing JSON. Sustained singing is not removed by speech-only VAD; unreliable no-speech segments are excluded. Singing and overlapping vocals can still reduce accuracy. |
 | Guitar tabs / Bass tabs | Basic Pitch CPU note estimates, proposed string/fret assignments, text tabs, MusicXML scores, MIDI and JSON. Guitar requires the six-stem model. Open MusicXML in a compatible Guitar Pro or notation editor and review rhythm, notes and tuning. |
-| Drum tabs & MIDI | Transient/band-based kick, snare and closed-hi-hat estimates, text/percussion MusicXML, General MIDI channel-10 events, and JSON. The MIDI uses the same detected hits as the drum tabs. This is not a full drum-kit classifier. |
+| Drum tabs & MIDI | An isolated ADT_STR CPU model estimates 26 percussion classes, including toms, ride, crashes and open/closed/pedal hats. Text, percussion MusicXML, General MIDI channel-10 events and JSON use the same detected hits. Class-level validation is ongoing; predictions are not a guaranteed acoustic-kit score. |
 | Lead / backing vocals | A second local karaoke model separates the vocal stem into `lead_vocals` and `backing_vocals`. In vocal-isolate mode, these appear beside `instrumental`. Separation is approximate and can contain bleed. |
 
-Tabs and MIDI use the detected tempo map when analysis is enabled; otherwise, a 120 BPM reference clock preserves note timings in seconds. Meter is assumed to be 4/4. Tuning and fingerings are proposals, not a uniquely identifiable property of a recording. Unassignable pitches remain in MIDI/JSON and are explicitly marked in the text export.
+Tab requests automatically obtain beat/meter timing, even if the full key/section analysis is not enabled. MIDI and MusicXML preserve detected time-signature changes; uncertain meter is written as unmetered notation. Tempo maps use quarter-note BPM, so six eighth-note pulses at 120 pulses/minute become 60 quarter-note BPM in 6/8. Review ambiguous metrical interpretations.
+
+Tuning inference examines the entire guitar/bass stem in bounded windows rather than only its introduction. It ranks supported standard, drop and extended-range tunings using stable pitch duration, multiple open-string matches and playable fret ranges. A lowest note alone cannot establish tuning. Ambiguous cases retain alternatives and are marked as such; notation uses an explicitly proposed fingering. Unassignable pitches remain in MIDI/JSON and are marked in the text export.
 
 The [model and runtime notes](configuration.md#model-downloads) describe caching and upstream weight licenses. Automatic analysis and transcriptions need human review.
 

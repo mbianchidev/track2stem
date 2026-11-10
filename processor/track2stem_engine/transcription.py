@@ -10,10 +10,24 @@ from scipy.signal import find_peaks
 
 from .audio import check_cancelled
 from .models import get_session
+from .tuning import infer_tuning
 
-DRUM_NAMES = {36: "Kick", 38: "Snare", 42: "Closed hi-hat", 49: "Crash"}
-TUNINGS = {"guitar": (40, 45, 50, 55, 59, 64), "bass": (28, 33, 38, 43)}
+DRUM_NAMES = {
+    35: "Acoustic kick", 36: "Kick", 37: "Side stick", 38: "Snare", 39: "Hand clap", 40: "Electric snare",
+    41: "Low tom", 42: "Closed hi-hat", 44: "Pedal hi-hat", 46: "Open hi-hat", 47: "Mid tom",
+    49: "Crash", 50: "High tom", 51: "Ride", 52: "China cymbal", 54: "Tambourine", 55: "Splash",
+    56: "Cowbell", 58: "Vibraslap", 64: "Congas/timbales", 70: "Shaker", 71: "Whistle", 73: "Guiro",
+    75: "Claves/wood block", 78: "Cuica", 81: "Triangle",
+}
 DIVISIONS = 480
+DRUM_POSITIONS = {
+    35: ("F", 4), 36: ("F", 4), 37: ("C", 5), 38: ("C", 5), 39: ("C", 5), 40: ("C", 5),
+    41: ("A", 4), 42: ("G", 5), 44: ("D", 4), 46: ("G", 5), 47: ("D", 5),
+    49: ("A", 5), 50: ("E", 5), 51: ("F", 5), 52: ("A", 5), 54: ("F", 5),
+    55: ("A", 5), 56: ("G", 5), 58: ("B", 4), 64: ("E", 5), 70: ("G", 5),
+    71: ("B", 5), 73: ("B", 5), 75: ("C", 5), 78: ("D", 5), 81: ("F", 5),
+}
+CYMBALS = {42, 44, 46, 49, 51, 52, 54, 55, 70}
 
 
 def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled):
@@ -60,32 +74,6 @@ def pitched_notes(audio, sample_rate, instrument, model_dir, report, cancelled):
     return sorted(notes, key=lambda note: (note["start"], note["pitch"]))
 
 
-def drum_notes(audio, sample_rate, cancelled):
-    mono = librosa.resample(audio.mean(axis=1), orig_sr=sample_rate, target_sr=22050)
-    spectrum = np.abs(librosa.stft(mono, n_fft=2048, hop_length=220))
-    frequencies = librosa.fft_frequencies(sr=22050, n_fft=2048)
-    total = np.sum(spectrum ** 2, axis=0)
-    events = []
-    for low, high, pitch in ((25, 180, 36), (180, 4000, 38), (4000, 11025, 42)):
-        check_cancelled(cancelled)
-        energy = np.sum(spectrum[(frequencies >= low) & (frequencies < high)] ** 2, axis=0)
-        envelope = np.maximum(0, np.diff(energy, prepend=0))
-        maximum = float(envelope.max(initial=0))
-        if maximum < 1e-8:
-            continue
-        peaks, _ = find_peaks(envelope, distance=7, prominence=maximum * .12, height=maximum * .15)
-        for peak in peaks:
-            if energy[peak] / max(float(total[peak]), 1e-8) < .15:
-                continue
-            start = max(0, float((peak * 220 - 512) / 22050))
-            if start >= len(audio) / sample_rate:
-                continue
-            events.append({"start": round(start, 5),
-                           "end": round(min(start + .06, len(audio) / sample_rate), 5),
-                           "pitch": pitch, "velocity": max(25, min(127, round(127 * np.sqrt(envelope[peak] / maximum))))})
-    return sorted(events, key=lambda note: (note["start"], note["pitch"]))
-
-
 def tempo_map(values):
     points = []
     for value in sorted(values or [{"time": 0, "bpm": 120}], key=lambda entry: entry["time"]):
@@ -109,14 +97,41 @@ def ticks_at(seconds, points):
     return round(ticks)
 
 
-def write_midi(notes, instrument, path, points):
+def meter_map(values):
+    if values is None:
+        return [{"time": 0, "numerator": 4, "denominator": 4, "pulse_quarters": 1, "assumed": True}]
+    points = []
+    for value in sorted(values, key=lambda entry: entry["time"]):
+        time = float(value["time"])
+        numerator, denominator = value["numerator"], value["denominator"]
+        pulse = float(value.get("pulse_quarters", 1))
+        if (not math.isfinite(time) or time < 0 or not isinstance(numerator, int) or isinstance(numerator, bool)
+                or not 1 <= numerator <= 32 or not isinstance(denominator, int) or isinstance(denominator, bool)
+                or denominator not in (1, 2, 4, 8, 16, 32)
+                or not math.isfinite(pulse) or not 0 < pulse <= 8):
+            raise ValueError("Invalid meter map")
+        if points and time == points[-1]["time"]:
+            raise ValueError("Meter changes must have distinct times")
+        point = {"time": time, "numerator": numerator, "denominator": denominator, "pulse_quarters": pulse}
+        if not points or any(point[key] != points[-1][key] for key in ("numerator", "denominator", "pulse_quarters")):
+            points.append(point)
+    return points
+
+
+def write_midi(notes, instrument, path, points, meters=None):
     midi = mido.MidiFile(ticks_per_beat=DIVISIONS)
     track = mido.MidiTrack()
     midi.tracks.append(track)
     channel = 9 if instrument == "drums" else 0
     events = [(ticks_at(point["time"], points), 0,
                mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(point["bpm"]))) for point in points]
+    signatures = meter_map(meters)
+    events.extend((ticks_at(point["time"], points), 0,
+                   mido.MetaMessage("time_signature", numerator=point["numerator"], denominator=point["denominator"],
+                                    clocks_per_click=round(24 * point["pulse_quarters"]))) for point in signatures)
     track.append(mido.MetaMessage("track_name", name=f"Track2stem {instrument} estimate"))
+    if not signatures:
+        track.append(mido.MetaMessage("text", text="Meter undetermined; notes use an unmetered quarter-note clock"))
     if instrument != "drums":
         track.append(mido.Message("program_change", program=33 if instrument == "bass" else 24, channel=channel))
     for note in notes:
@@ -132,10 +147,8 @@ def write_midi(notes, instrument, path, points):
     midi.save(path)
 
 
-def assign_frets(notes, instrument):
-    tuning = list(TUNINGS[instrument])
-    if notes and min(note["pitch"] for note in notes) < tuning[0]:
-        tuning[0] = min(note["pitch"] for note in notes)
+def assign_frets(notes, instrument, tuning=None):
+    tuning = list(tuning or infer_tuning(notes, instrument)["strings"])
     assigned = []
     active = []
     position = 0
@@ -167,27 +180,49 @@ def add_pitch(parent, midi):
     ET.SubElement(pitch, "octave").text = str(midi // 12 - 1)
 
 
-def write_musicxml(notes, instrument, path, points, tuning):
+def write_musicxml(notes, instrument, path, points, tuning, meters=None):
     root = ET.Element("score-partwise", version="4.0")
     work = ET.SubElement(root, "work")
     ET.SubElement(work, "work-title").text = f"Track2stem {instrument} transcription (estimate)"
     parts = ET.SubElement(root, "part-list")
     score_part = ET.SubElement(parts, "score-part", id="P1")
     ET.SubElement(score_part, "part-name").text = instrument.title()
+    if instrument == "drums":
+        pitches = sorted({note["pitch"] for note in notes})
+        for pitch in pitches:
+            declaration = ET.SubElement(score_part, "score-instrument", id=f"D{pitch}")
+            ET.SubElement(declaration, "instrument-name").text = DRUM_NAMES.get(pitch, f"GM percussion {pitch}")
+        for pitch in pitches:
+            declaration = ET.SubElement(score_part, "midi-instrument", id=f"D{pitch}")
+            ET.SubElement(declaration, "midi-channel").text = "10"
+            ET.SubElement(declaration, "midi-unpitched").text = str(pitch + 1)
     part = ET.SubElement(root, "part", id="P1")
     quantized = [{**note, "first": round(ticks_at(note["start"], points) / 30) * 30,
                   "last": max(round(ticks_at(note["start"], points) / 30) * 30 + 30,
                               round(ticks_at(note["end"], points) / 30) * 30)} for note in notes]
     end = max((note["last"] for note in quantized), default=DIVISIONS * 4)
-    bar = DIVISIONS * 4
-    for offset in range(0, end, bar):
-        measure = ET.SubElement(part, "measure", number=str(offset // bar + 1))
-        if offset == 0:
+    signatures = [{**point, "tick": ticks_at(point["time"], points)} for point in meter_map(meters)]
+    offset, measure_number, previous_signature = 0, 0, None
+    while offset < end:
+        signature = next((point for point in reversed(signatures) if point["tick"] <= offset), None)
+        next_change = next((point["tick"] for point in signatures if point["tick"] > offset), end)
+        bar = round(DIVISIONS * signature["numerator"] * 4 / signature["denominator"]) if signature else end - offset
+        measure_end = min(offset + bar, end, next_change)
+        measure_number += 1
+        measure = ET.SubElement(part, "measure", number=str(measure_number))
+        if measure_end - offset < bar:
+            measure.set("implicit", "yes")
+        if offset == 0 or signature != previous_signature:
             attributes = ET.SubElement(measure, "attributes")
-            ET.SubElement(attributes, "divisions").text = str(DIVISIONS)
+            if offset == 0:
+                ET.SubElement(attributes, "divisions").text = str(DIVISIONS)
             time = ET.SubElement(attributes, "time")
-            ET.SubElement(time, "beats").text = "4"
-            ET.SubElement(time, "beat-type").text = "4"
+            if signature:
+                ET.SubElement(time, "beats").text = str(signature["numerator"])
+                ET.SubElement(time, "beat-type").text = str(signature["denominator"])
+            else:
+                ET.SubElement(time, "senza-misura")
+        if offset == 0:
             clef = ET.SubElement(attributes, "clef")
             ET.SubElement(clef, "sign").text = "percussion" if instrument == "drums" else "TAB"
             if tuning:
@@ -201,15 +236,15 @@ def write_musicxml(notes, instrument, path, points, tuning):
                         ET.SubElement(staff_tuning, f"tuning-{child.tag}").text = child.text
         for point in points:
             tick = ticks_at(point["time"], points)
-            if offset <= tick < offset + bar:
+            if offset <= tick < measure_end:
                 direction = ET.SubElement(measure, "direction")
                 kind = ET.SubElement(direction, "direction-type")
                 ET.SubElement(kind, "words").text = f"{point['bpm']:g} BPM"
                 ET.SubElement(direction, "offset").text = str(tick - offset)
                 ET.SubElement(direction, "sound", tempo=str(point["bpm"]))
-        boundaries = sorted({offset, min(offset + bar, end),
-                             *[max(offset, min(offset + bar, note[key])) for note in quantized
-                               for key in ("first", "last") if offset < note[key] < offset + bar]})
+        boundaries = sorted({offset, measure_end,
+                             *[note[key] for note in quantized for key in ("first", "last")
+                               if offset < note[key] < measure_end]})
         for first, last in zip(boundaries, boundaries[1:]):
             active = [note for note in quantized if note["first"] <= first < note["last"]]
             for index, item in enumerate(active or [None]):
@@ -220,8 +255,9 @@ def write_musicxml(notes, instrument, path, points, tuning):
                     ET.SubElement(element, "rest")
                 elif instrument == "drums":
                     unpitched = ET.SubElement(element, "unpitched")
-                    ET.SubElement(unpitched, "display-step").text = {36: "F", 38: "C", 42: "G", 49: "A"}.get(item["pitch"], "C")
-                    ET.SubElement(unpitched, "display-octave").text = "4" if item["pitch"] == 36 else "5"
+                    step, octave = DRUM_POSITIONS.get(item["pitch"], ("C", 5))
+                    ET.SubElement(unpitched, "display-step").text = step
+                    ET.SubElement(unpitched, "display-octave").text = str(octave)
                 else:
                     add_pitch(element, item["pitch"])
                 ET.SubElement(element, "duration").text = str(last - first)
@@ -229,6 +265,10 @@ def write_musicxml(notes, instrument, path, points, tuning):
                     ties = [kind for kind, condition in (("stop", item["first"] < first), ("start", item["last"] > last)) if condition]
                     for kind in ties:
                         ET.SubElement(element, "tie", type=kind)
+                    if instrument == "drums":
+                        ET.SubElement(element, "instrument", id=f"D{item['pitch']}")
+                        if item["pitch"] in CYMBALS:
+                            ET.SubElement(element, "notehead").text = "circle-x" if item["pitch"] == 46 else "x"
                     notation = ET.SubElement(element, "notations")
                     for kind in ties:
                         ET.SubElement(notation, "tied", type=kind)
@@ -236,25 +276,35 @@ def write_musicxml(notes, instrument, path, points, tuning):
                         technical = ET.SubElement(notation, "technical")
                         ET.SubElement(technical, "string").text = str(item["string"])
                         ET.SubElement(technical, "fret").text = str(item["fret"])
+        offset, previous_signature = measure_end, signature
     ET.indent(root)
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
 
-def write_transcription(notes, instrument, directory, tempos=None):
+def write_transcription(notes, instrument, directory, tempos=None, meters=None, tuning_estimate=None):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     points = tempo_map(tempos)
-    assigned, tuning = (notes, None) if instrument == "drums" else assign_frets(notes, instrument)
+    tuning_estimate = None if instrument == "drums" else tuning_estimate or infer_tuning(notes, instrument)
+    assigned, tuning = (notes, None) if instrument == "drums" else assign_frets(notes, instrument, tuning_estimate["strings"])
     paths = {f"{instrument}_{kind}": str(directory / f"{instrument}.{extension}")
              for kind, extension in (("tabs", "txt"), ("score", "musicxml"), ("midi", "mid"), ("notes", "json"))}
-    write_midi(notes, instrument, paths[f"{instrument}_midi"], points)
-    write_musicxml(assigned, instrument, paths[f"{instrument}_score"], points, tuning)
+    write_midi(notes, instrument, paths[f"{instrument}_midi"], points, meters)
+    write_musicxml(assigned, instrument, paths[f"{instrument}_score"], points, tuning, meters)
+    signatures = meter_map(meters)
+    description = ", ".join(f"{point['numerator']}/{point['denominator']} at {point['time']:g}s" for point in signatures)
     lines = [f"Track2stem {instrument} tablature", "Automatic estimate. Review notes, rhythm and tuning before use.",
              "MIDI and MusicXML preserve timing; text rows use seconds.",
-             "Meter: assumed 4/4. Without analysis, MIDI uses a 120 BPM reference clock."]
+             "Meter: " + (description if signatures else "undetermined; unmetered notation."),
+             "Without timing analysis, MIDI uses a 120 BPM reference clock."]
+    if meters is None:
+        lines.append("Meter: assumed 4/4 because no meter analysis was supplied.")
     if tuning:
         lines.append("Proposed open strings, low to high: " + ", ".join(librosa.midi_to_note(tuning, unicode=False)))
         lines.append("Tuning and fingerings are proposals, not a unique solution.")
+        if tuning_estimate["ambiguous"]:
+            lines.append("Tuning is ambiguous; candidate: " + tuning_estimate["candidates"][0]["name"]
+                         if tuning_estimate["candidates"] else "Tuning could not be inferred; standard strings used for notation.")
     if not notes:
         lines.append("No notes were detected. Try a cleaner isolated stem.")
     for item in assigned:
@@ -264,7 +314,10 @@ def write_transcription(notes, instrument, directory, tempos=None):
     Path(paths[f"{instrument}_tabs"]).write_text("\n".join(lines) + "\n", encoding="utf-8")
     Path(paths[f"{instrument}_notes"]).write_text(json.dumps({
         "instrument": instrument, "notes": notes, "fingerings": assigned, "tuning": tuning,
-        "tempo_changes": points, "estimated": True,
+        "tuning_estimate": tuning_estimate,
+        "method": "ADT_STR setting-tau-0.8; 26 drum classes; CC-BY-SA-4.0 component"
+                  if instrument == "drums" else "Basic Pitch note estimates with proposed string/fret assignments",
+        "tempo_changes": points, "meter_changes": signatures, "estimated": True,
         "warnings": ["Unassigned pitches remain in MIDI; their string/fret could not be resolved."]
                     if any("string" not in note for note in assigned) and tuning else [],
     }, allow_nan=False), encoding="utf-8")

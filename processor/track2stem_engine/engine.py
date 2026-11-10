@@ -83,11 +83,15 @@ class Engine:
                 "stem_files": {name: str(raw_dir / f"{name}.wav") for name in settings.mix_stems},
                 "artifacts": {}, "analysis": None,
             }
-            if settings.analysis or settings.click_track:
+            if settings.analysis or settings.click_track or settings.guitar_tabs or settings.bass_tabs or settings.drum_tabs:
                 from .analysis import analyze, make_click_track
                 report(76, "Detecting tempo changes, key, tuning and song sections")
                 original, rate = read_audio(source, cancelled)
-                analysis = analyze(original, rate, stems, cancelled)
+                if settings.analysis or settings.click_track:
+                    analysis = analyze(original, rate, stems, cancelled, self.model_dir, report)
+                else:
+                    from .rhythm import detect_rhythm
+                    analysis = detect_rhythm(original, rate, self.model_dir, report, cancelled)
                 manifest["analysis"] = analysis
                 artifact_dir = job_dir / "artifacts"
                 artifact_dir.mkdir(exist_ok=True)
@@ -96,7 +100,9 @@ class Engine:
                 manifest["artifacts"]["analysis"] = str(analysis_path)
                 for name, keys, values in (
                     ("tempo", ("time", "bpm"), analysis["tempo_changes"]),
-                    ("sections", ("start", "end", "label", "confidence"), analysis["sections"]),
+                    ("sections", ("start", "end", "label", "confidence"), analysis.get("sections", [])),
+                    ("meter", ("time", "numerator", "denominator", "pulse_quarters", "confidence"),
+                     analysis.get("meter_changes", [])),
                 ):
                     path = artifact_dir / f"{name}.csv"
                     with path.open("w", newline="", encoding="utf-8") as target:
@@ -106,7 +112,8 @@ class Engine:
                     manifest["artifacts"][name] = str(path)
                 if settings.click_track:
                     path = artifact_dir / "click.wav"
-                    write_audio(path, make_click_track(analysis["beats"], len(original), rate), rate,
+                    write_audio(path, make_click_track(analysis["beats"], len(original), rate,
+                                                      analysis.get("downbeats", [])), rate,
                                 cancelled=cancelled)
                     manifest["artifacts"]["click"] = str(path)
             if settings.lyrics:
@@ -117,17 +124,20 @@ class Engine:
                 manifest["lyrics"] = transcript
                 manifest["artifacts"].update(artifacts)
             if settings.guitar_tabs or settings.bass_tabs or settings.drum_tabs:
-                from .transcription import drum_notes, pitched_notes, write_transcription
+                from .transcription import pitched_notes, write_transcription
+                from .drums import drum_notes
                 for instrument, requested in (("guitar", settings.guitar_tabs), ("bass", settings.bass_tabs),
                                               ("drums", settings.drum_tabs)):
                     if not requested:
                         continue
                     report(82, f"Transcribing {instrument}")
-                    notes = (drum_notes(stems[instrument], sample_rate, cancelled) if instrument == "drums"
+                    notes = (drum_notes(raw_dir / "drums.wav", self.model_dir, report, cancelled) if instrument == "drums"
                              else pitched_notes(stems[instrument], sample_rate, instrument,
                                                 self.model_dir, report, cancelled))
                     artifacts = write_transcription(notes, instrument, job_dir / "artifacts",
-                                                     (manifest["analysis"] or {}).get("tempo_changes"))
+                                                     (manifest["analysis"] or {}).get("tempo_changes"),
+                                                     meters=(manifest["analysis"] or {}).get("meter_changes", []),
+                                                     tuning_estimate=(manifest["analysis"] or {}).get("tuning", {}).get(instrument))
                     manifest["artifacts"].update(artifacts)
             report(90, "Exporting audio")
             manifest["outputs"] = self._render(job_dir, manifest, cancelled)

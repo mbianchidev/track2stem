@@ -24,6 +24,7 @@ Start with at least 8 GB of RAM available to the container runtime and several G
 | `TRACK2STEM_OFFLINE` | Engine | Set to `1` to require already-cached auxiliary models |
 | `TRACK2STEM_FFMPEG` | Engine | `ffmpeg`; an absolute executable can be injected by a packaged host |
 | `TRACK2STEM_NODE` | YouTube importer | Node.js executable override; otherwise yt-dlp discovers `node` |
+| `TRACK2STEM_LYRICS_MODEL` | Lyrics | `large-v3-turbo`; `small` and `base` select lighter, less accurate local CPU alternatives |
 
 The Compose file hardcodes service environment values and port mappings. It does not interpolate [.env.example](../.env.example), so copying that example to `.env` alone does **not** reconfigure the stack. Change the relevant `environment` entries and port mappings in [docker-compose.yml](../docker-compose.yml), then recreate affected services.
 
@@ -47,7 +48,11 @@ The stack has no authentication, TLS termination, or rate limiting, and its Comp
 
 Demucs downloads the selected model when it is first used, not when containers become healthy. Internet access is required for uncached weights; download size and processing time depend on the model.
 
-Compose persists model downloads in the `model-cache` volume. The engine retains one selected Demucs model in memory; switching models releases that cache entry. Auxiliary CPU models are downloaded only for enabled features: Spotify Basic Pitch for pitched transcription, Whisper base for lyrics, and UVR MDX-NET KARA 2 for lead/backing vocal splitting. The ONNX downloads have pinned SHA-256 checksums. Download failures are explicit errors; local audio is never uploaded to a model service.
+Compose persists model downloads in the `model-cache` volume. The engine retains one selected Demucs model in memory; switching models releases that cache entry. Auxiliary CPU models are downloaded only for enabled features: Spotify Basic Pitch for pitched transcription, Beat This small0 for beat/downbeat tracking, Whisper large-v3-turbo for lyrics, ADT_STR for full-kit drum transcription, and UVR MDX-NET KARA 2 for lead/backing vocal splitting. ONNX, beat and drum downloads have pinned SHA-256 checksums. Download failures are explicit errors; local audio is never uploaded to a model service.
+
+Beat This small0 is about 8 MB and its authors explicitly license code and published weights under MIT. ADT_STR's checkpoint is about 289 MB. Its adapted CPU implementation runs as a separate process over a JSON/file interface and retains **CC-BY-SA-4.0**, including attribution and ShareAlike obligations for distributed adaptations. It does not import the Flask service or require the original training stack. Its source and notices accompany native packages. See [Beat This](https://github.com/CPJKU/beat_this#license) and the [drum component's terms and provenance](../processor/drum_transcriber/LICENSE).
+
+The default lyrics model needs a substantially larger first-use download (about 1.6 GB) and more CPU/RAM than Whisper base. `TRACK2STEM_LYRICS_MODEL=small` or `base` retains a lighter option. Singing is not passed through speech-only VAD, which can discard sustained words. Very low-confidence/no-speech segments are explicitly excluded; transcriptions still need review.
 
 Weights are not committed or redistributed with Track2stem and remain subject to their upstream terms. Basic Pitch is Apache-2.0; Whisper and Demucs have their own upstream licenses. The public UVR model download does not provide a clear model-specific redistribution license. Verify permission before redistributing or commercially deploying those weights; this repository's MIT license does not relicense third-party models. See the [Basic Pitch source](https://github.com/spotify/basic-pitch), [Whisper source](https://github.com/openai/whisper), and [UVR model source](https://github.com/TRvlvr/model_repo).
 

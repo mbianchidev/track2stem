@@ -21,18 +21,40 @@ def check_cancelled(cancelled):
         raise CancelledError("Cancelled by user")
 
 
-def run_command(command, cancelled=None, timeout=600):
+def run_command(command, cancelled=None, timeout=600, cwd=None, on_output=None):
     cancelled = cancelled or Event()
     check_cancelled(cancelled)
+    if on_output is not None and not hasattr(os, "pread"):
+        raise RuntimeError("Streaming local inference progress requires the supported POSIX runtime")
     with tempfile.TemporaryFile() as output:
-        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=output, stderr=output)
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=output, stderr=output, cwd=cwd)
         deadline = time.monotonic() + timeout
+        offset, pending = 0, b""
+
+        def drain(final=False):
+            nonlocal offset, pending
+            if on_output is None:
+                return
+            while chunk := os.pread(output.fileno(), 65536, offset):
+                offset += len(chunk)
+                pending += chunk
+                while b"\n" in pending:
+                    line, pending = pending.split(b"\n", 1)
+                    on_output(line.decode("utf-8", errors="replace"))
+                if len(pending) > 65536:
+                    raise RuntimeError("Local command emitted an oversized progress line")
+            if final and pending:
+                on_output(pending.decode("utf-8", errors="replace"))
+                pending = b""
+
         try:
             while process.poll() is None:
                 check_cancelled(cancelled)
+                drain()
                 if time.monotonic() > deadline:
                     raise TimeoutError(f"{Path(command[0]).name} timed out after {timeout}s")
                 cancelled.wait(.1)
+            drain(final=True)
             output.seek(0)
             details = output.read()[-16000:].decode("utf-8", errors="replace")
             if process.returncode:
