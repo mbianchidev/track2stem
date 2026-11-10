@@ -1,0 +1,37 @@
+ADT_STR CPU inference component
+
+This component is adapted from pier-maker92/ADT_STR, version 1.0.0:
+https://github.com/pier-maker92/ADT_STR/tree/77dbef225e7029478ebfb916f20c7a00274f0f12
+
+The original work and this adapted component are licensed under the
+Creative Commons Attribution-ShareAlike 4.0 International License:
+https://creativecommons.org/licenses/by-sa/4.0/
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Changes: inference-only CPU implementation for Python 3.14 and current
+PyTorch; training/Hugging Face wrappers removed; explicit General MIDI
+mapping, standalone JSON interface, bounded streaming input, progress,
+owning-process checks, and grammar-constrained decoding added. The
+decoder enforces monotonic window-local onsets and prevents duplicate
+same-instrument/same-onset loops rather than silently truncating them.
+Inadequate probability mass on valid tokens is an explicit error.
+Bounded beam search considers complete event sequences rather than
+only greedy token choices.
+Events require local acoustic attack support. Tonal tom registers may
+be refined from at least three well-separated pitch clusters within the
+recording, excluding simultaneous kick/tom ambiguity; no instrument samples
+or fixed SoundFont pitch labels are used.
+Bounded peak normalization and overlapping context improve quiet-hit
+recognition; velocities are compensated for the applied input gain.
+Release-only windows without a new transient are not amplified into
+spurious events.
+
+The separately downloaded model is published by the original author:
+https://huggingface.co/Pierfrancesco/adt-str
+The original repository's README states that this work is CC-BY-SA-4.0.
+Model revision: a33c5c6b191a4ca1e0f6dc22140947485eb36ce8, setting-tau-0.8.
+
+This license applies to this component, not to independent Track2stem
+code or other third-party dependencies. Preserve this attribution and
+the ShareAlike terms when distributing adapted versions of this work.

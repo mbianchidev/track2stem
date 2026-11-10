@@ -1,0 +1,147 @@
+name: Native release
+
+on:
+  # Automatic tag releases are intentionally disabled until explicitly enabled.
+  # push:
+  #   tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build
+        required: true
+        type: string
+      publish:
+        description: Publish verified packages to a GitHub Release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Build macOS arm64 VST3 and AU
+    runs-on: macos-26
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: Checkout the exact release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.12.1'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14.9'
+          cache: pip
+          cache-dependency-path: |
+            processor/requirements.txt
+            plugin/requirements-build.txt
+
+      - name: Validate version, source tag and release guards
+        id: version
+        run: |
+          python -m unittest discover -s plugin/tests -p 'test_*.py'
+          python plugin/release.py --validate-tag "$RELEASE_TAG" --check-ref --github-output "$GITHUB_OUTPUT"
+
+      - name: Build the portable native release
+        run: bash plugin/build.sh --release-tag "$RELEASE_TAG"
+
+      - name: Verify actual frozen CPU inference and exports
+        run: |
+          python plugin/tests/check-worker.py \
+            --worker "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+            --models "$RUNNER_TEMP/track2stem-models" \
+            --ui "$PWD/plugin/build/web" \
+            --output "$RUNNER_TEMP/release-worker-evidence"
+
+      - name: Verify installation and publication assets
+        env:
+          SOURCE_SHA: ${{ steps.version.outputs.source_sha }}
+        run: |
+          python plugin/tests/check-package.py plugin/dist/*.zip
+          python plugin/release.py --verify-assets plugin/dist --tag "$RELEASE_TAG" --source-sha "$SOURCE_SHA"
+
+      - name: Upload verified release packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Track2stem-macos-arm64
+          path: |
+            plugin/dist/*.zip
+            plugin/dist/*.zip.sha256
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish verified native release
+    needs: build
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      RELEASE_VERSION: ${{ needs.build.outputs.version }}
+      PRERELEASE: ${{ needs.build.outputs.prerelease }}
+    steps:
+      - name: Checkout the verified source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Download verified packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Track2stem-macos-arm64
+          path: release-artifacts
+
+      - name: Revalidate tag, checksums, versions and architectures
+        run: |
+          python3 plugin/release.py --validate-tag "$RELEASE_TAG" --check-ref --check-remote
+          python3 plugin/release.py --verify-assets release-artifacts --tag "$RELEASE_TAG" --source-sha "$SOURCE_SHA"
+
+      - name: Create a draft release without overwriting existing releases
+        shell: bash
+        run: |
+          prerelease=()
+          if [[ "$PRERELEASE" == true ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" release-artifacts/*.zip release-artifacts/*.zip.sha256 \
+            --verify-tag --draft "${prerelease[@]}" \
+            --title "Track2stem $RELEASE_VERSION" --generate-notes \
+            --notes "macOS Apple Silicon VST3 and AU with a bundled local CPU runtime. Verify the SHA-256 sidecar, extract the complete ZIP, quit the DAW, then run Install.command. Packages are ad-hoc signed, not Apple-notarized. For upgrades, move old plugin/Runtime folders aside while preserving Data and model caches. Full installation, model-license and supported-host details are included in the native plugin guide."
+
+      - name: Verify uploaded assets before publication
+        run: |
+          gh release download "$RELEASE_TAG" --pattern '*.zip*' --dir "$RUNNER_TEMP/uploaded-release"
+          python3 plugin/release.py --verify-assets "$RUNNER_TEMP/uploaded-release" --tag "$RELEASE_TAG" --source-sha "$SOURCE_SHA"
+
+      - name: Publish the verified draft
+        run: |
+          python3 plugin/release.py --validate-tag "$RELEASE_TAG" --check-ref --check-remote
+          gh release edit "$RELEASE_TAG" --draft=false
+          gh release view "$RELEASE_TAG" --json url,isDraft,tagName,assets --jq 'if .isDraft then error("Release is still a draft") else . end'

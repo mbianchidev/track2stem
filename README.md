@@ -1,14 +1,14 @@
-<img src="frontend/public/favicon.svg" width="64" height="64" alt="Track2stem audio stem icon">
+<img src="frontend/public/logo.svg" width="360" height="80" alt="Track2stem audio stem routing logo">
 
 # Track2stem
 
 [![CI](https://github.com/mbianchidev/track2stem/actions/workflows/ci.yml/badge.svg)](https://github.com/mbianchidev/track2stem/actions/workflows/ci.yml)
 
-[Documentation](docs/README.md) | [Report a bug](https://github.com/mbianchidev/track2stem/issues) | [Roadmap](docs/roadmap.md)
+[Documentation](docs/README.md) | [DAW plugin](docs/native-plugin.md) | [Report a bug](https://github.com/mbianchidev/track2stem/issues) | [Roadmap](docs/roadmap.md)
 
 ![Track2stem studio workspace with a generated source waveform, separation settings, and output area](docs/images/track2stem.png)
 
-*The upload workflow with a generated WAV sample. No personal audio or simulated separation results are shown.*
+*A generated WAV processed locally, with real stem waveforms, instrument levels, and practice-tool exports. No personal audio or fabricated results.*
 
 Track2stem is a self-hosted web application for musicians and audio enthusiasts who want separate vocal and instrument tracks for practice, remixing, or transcription. Upload audio, choose a Demucs model, and download all available stems or one isolated instrument with a backing track.
 
@@ -55,6 +55,10 @@ Read [configuration and operations](docs/configuration.md) before changing ports
 - MP3, WAV, FLAC, OGG, M4A, and AAC inputs; MP3 at 320 kbps, WAV, and FLAC outputs.
 - Processing status, elapsed time, audio waveforms, and browser-local recent-job history.
 - Individual downloads and an HTTP API for jobs, progress, and best-effort cancellation.
+- Per-instrument mix levels, including instruments inside backing tracks, without rerunning separation.
+- Local lyrics, tempo/key/tuning and section estimates, click tracks, and reviewable guitar/bass/drum notation and MIDI.
+- Bounded parallel CPU workers, a faster four-stem profile, cached models, and authorized YouTube video imports.
+- Independent Apple Silicon VST3/AU builds with the same local engine and interface; see [native installation and support evidence](docs/native-plugin.md).
 
 Planned persistence, authentication, queues, and observability are listed separately in the [roadmap](docs/roadmap.md).
 
@@ -72,4 +76,6 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contr
 
 ## License
 
-Track2stem is licensed under the [MIT License](LICENSE). It builds on Demucs, originally developed by Facebook Research; the [upstream repository](https://github.com/facebookresearch/demucs) is archived.
+Track2stem's own code is licensed under the [MIT License](LICENSE). Drum transcription invokes a separately licensed [CC-BY-SA-4.0 component](processor/drum_transcriber/LICENSE); third-party code and weights retain their original terms. See [model licenses](docs/configuration.md#model-downloads).
+
+It builds on Demucs, originally developed by Facebook Research; the [upstream repository](https://github.com/facebookresearch/demucs) is archived.

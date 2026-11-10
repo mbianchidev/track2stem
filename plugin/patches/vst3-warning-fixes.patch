@@ -1,0 +1,18 @@
+diff --git a/source/fstring.cpp b/source/fstring.cpp
+index 43b3424..e889c63 100644
+--- a/source/fstring.cpp
++++ b/source/fstring.cpp
+@@ -3368,10 +3368,10 @@ String& String::printFloat (double value, uint32 maxPrecision)
+ {
+ 	static constexpr auto kMaxAfterCommaResolution = 16;
+ 	// escape point for integer values, avoid unnecessary complexity later on
+-	const bool withinInt64Boundaries = value <= std::numeric_limits<int64>::max () &&
+-	                                   value >= std::numeric_limits<int64>::lowest ();
++	const auto lowestInt64 = static_cast<double> (std::numeric_limits<int64>::lowest ());
++	const bool withinInt64Boundaries = value < -lowestInt64 && value >= lowestInt64;
+ 	if (withinInt64Boundaries && (maxPrecision == 0 || std::round (value) == value))
+-		return printInt64 (value);
++		return printInt64 (static_cast<int64> (value));
+ 
+ 	const auto absValue = std::abs (value);
+ 	const uint32 valueExponent = absValue >= 1 ? std::log10 (absValue) : -std::log10 (absValue) + 1;

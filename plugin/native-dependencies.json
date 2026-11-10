@@ -1,0 +1,37 @@
+{
+  "python": {
+    "version": "3.14.9",
+    "archive": "cpython-3.14.9+20261021-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "directory": "python",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.14.9%2B20261021-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "9f8c3480b8f0db553c270db548e8a21ae8e39df412e5661d66e8050c5c6ed2a8"
+  },
+  "ffmpeg": {
+    "version": "9.0.2",
+    "archive": "ffmpeg-9.0.2.tar.xz",
+    "directory": "ffmpeg-9.0.2",
+    "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+    "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+  },
+  "lame": {
+    "version": "4.0",
+    "archive": "lame-4.0.tar.gz",
+    "directory": "lame-4.0",
+    "url": "https://downloads.sourceforge.net/project/lame/lame/4.0/lame-4.0.tar.gz",
+    "sha256": "3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb"
+  },
+  "pyav": {
+    "version": "19.0.2",
+    "archive": "av-19.0.2.tar.gz",
+    "directory": "av-19.0.2",
+    "url": "https://files.pythonhosted.org/packages/23/01/76b6bf563fe907597cf58f10d10168e93fe588b6db9f2658db87e87efa7e/av-19.0.2.tar.gz",
+    "sha256": "bebbc52598886480f4d861c575dc2b020785d6c04e1308680ddcc545e1b94c66"
+  },
+  "node": {
+    "version": "26.12.1",
+    "archive": "node-v26.12.1-darwin-arm64.tar.xz",
+    "directory": "node-v26.12.1-darwin-arm64",
+    "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-darwin-arm64.tar.xz",
+    "sha256": "18830bf448fe187c650dc28c98aa8c968ed1d40b6dd032c081e70a384a1bf660"
+  }
+}

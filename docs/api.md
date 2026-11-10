@@ -15,6 +15,10 @@ Use `http://localhost:8080/api` directly or `/api` through the frontend's Nginx 
 | `GET` | `/api/download/{id}/{stem}` | Download a completed job's stem |
 | `GET` | `/api/processing-status/{id}` | Get processor progress via the backend |
 | `GET` | `/api/health` | Return `{"status":"ok"}` |
+| `POST` | `/api/import` | Submit a single YouTube video URL and separation settings as JSON |
+| `POST` | `/api/jobs/{id}/mix` | Re-export a completed job with per-original-instrument gains |
+| `GET` | `/api/stems/{id}/{asset}` | Read a completed job's original lossless stem for synchronized preview |
+| `GET` | `/api/artifacts/{id}/{asset}` | Download an analysis, click, lyrics, tab, score or MIDI artifact |
 
 ## Upload options
 
@@ -27,10 +31,24 @@ Use `http://localhost:8080/api` directly or `/api` through the frontend's Nginx 
 | `isolate_stem` | `vocals` | `vocals`, `drums`, `bass`, `guitar`, `piano`, `other`; guitar/piano require `htdemucs_6s` |
 | `segment` | No override | Values in [advanced tuning](usage.md#advanced-tuning) |
 | `overlap` | No override | Values in [advanced tuning](usage.md#advanced-tuning); the browser sends `0.25` by default |
-| `shifts` | `0` | Integers 0 through 10; see the [upstream-default caveat](usage.md#advanced-tuning) |
+| `shifts` | `0` | Integers 0 through 10; zero disables shift passes |
 | `clip_mode` | `rescale` | `rescale`, `clamp` |
+| `workers` | `1` | Integers 1 through 4, within the processor's CPU count |
+| `analysis`, `click_track`, `lyrics`, `guitar_tabs`, `bass_tabs`, `drum_tabs`, `split_vocals` | `false` | `true`/`false` or `1`/`0`; see [practice tools](usage.md#practice-tools) |
 
 The processor validates numeric options and model/stem compatibility. A backend upload can return a job record before a later processor validation failure, which then appears in the job's `error`.
+
+## Imports, mixes and practice downloads
+
+`POST /api/import` accepts `{"url":"https://youtu.be/abcdefghijk","settings":{"output_format":"wav","analysis":"true"}}`. Settings use the same string-valued options as multipart uploads. Only canonical single-video YouTube URLs are accepted; see [import limits](usage.md#youtube-imports). The response is a normal pending job record.
+
+`POST /api/jobs/{id}/mix` accepts `{"gains":{"bass":1.5,"drums":0.5}}`. Gains are linear multipliers from 0 to 4, keyed by names in `mix_stems`. Omitted instruments return to unity. Unknown names, negative/non-finite gains, and out-of-range values are rejected. The response is the updated job, with regenerated `output_files`. Original stems remain available for future remixes. Isolate mode also accepts gains for every instrument inside its backing track.
+
+Completed jobs can include `mix_stems`, `gains`, `stem_files`, `analysis`, `lyrics`, `vocal_split`, `transcriptions` and `artifacts`. Map values are internal paths, not public URLs. Download an artifact by its exact map key, for example `/api/artifacts/{id}/drums_midi`, or a preview stem through `/api/stems/{id}/bass`. Downloads support HTTP byte ranges. MusicXML, MIDI, JSON, CSV, SRT and text have explicit content types.
+
+`transcriptions` contains compact policy/evidence summaries, not dense note arrays. Bass exports use a clean monophonic line by default. `/api/artifacts/{id}/bass_notes` preserves the selected `notes`, original neural `raw_candidates`, `selection_policy`, rejected-candidate count and warnings; MIDI/MusicXML/text use the selected line. Guitar notes JSON also retains raw candidates and acoustic onset-alignment details. Existing jobs created before this metadata was introduced may omit these additive fields.
+
+The shared headless engine's settings/job/result contract is version **1**. It uses `outputs` internally; the Go web adapter retains the existing public `output_files` field.
 
 ## Examples
 
@@ -73,4 +91,4 @@ Statuses are `pending`, `processing`, `completed`, or `failed`. Completed record
 
 The backend stores jobs in memory only. Deletion returns `{"status":"deleted"}` but is not a disk-cleanup operation. Restart and retention behavior are described in [data lifecycle](configuration.md#limitations-and-data-lifecycle).
 
-Progress responses are separate from job records. The backend can return an `unknown` progress state when the processor is unavailable; check the job endpoint for its final status or error.
+Progress responses are separate from job records. An unreachable processor returns HTTP 503 rather than success-shaped progress. The browser continues checking job status and reports the temporary progress failure.

@@ -1,0 +1,103 @@
+--- a/libmp3lame/VbrTag.c
++++ b/libmp3lame/VbrTag.c
+@@ -218,7 +218,7 @@
+     return (isTag0 || isTag1);
+ }
+ 
+-#define SHIFT_IN_BITS_VALUE(x,n,v) ( x = (x << (n)) | ( (v) & ~(-1 << (n)) ) )
++#define SHIFT_IN_BITS_VALUE(x,n,v) ( x = (x << (n)) | ( (v) & ((1u << (n)) - 1u) ) )
+ 
+ static void
+ setLameTagFrameHeader(lame_internal_flags const *gfc, unsigned char *buffer)
+@@ -394,10 +394,8 @@
+     }
+ 
+     if (head_flags & TOC_FLAG) {
+-        if (pTagData->toc != NULL) {
+-            for (i = 0; i < NUMTOCENTRIES; i++)
+-                pTagData->toc[i] = buf[i];
+-        }
++        for (i = 0; i < NUMTOCENTRIES; i++)
++            pTagData->toc[i] = buf[i];
+         buf += NUMTOCENTRIES;
+     }
+ 
+@@ -593,7 +591,6 @@
+     SessionConfig_t const *const cfg = &gfc->cfg;
+ 
+     int     nBytesWritten = 0;
+-    int     i;
+ 
+     int     enc_delay = gfc->ov_enc.encoder_delay; /* encoder delay */
+     int     enc_padding = gfc->ov_enc.encoder_padding; /* encoder padding  */
+--- a/libmp3lame/bitstream.c
++++ b/libmp3lame/bitstream.c
+@@ -987,10 +987,10 @@
+ static int
+ do_gain_analysis(lame_internal_flags * gfc, unsigned char* buffer, int minimum)
+ {
++#ifdef DECODE_ON_THE_FLY
+     SessionConfig_t const *const cfg = &gfc->cfg;
+     RpgStateVar_t const *const rsv = &gfc->sv_rpg;
+     RpgResult_t *const rov = &gfc->ov_rpg;
+-#ifdef DECODE_ON_THE_FLY
+     if (cfg->decode_on_the_fly) { /* decode the frame */
+         sample_t pcm_buf[2][1152];
+         int     mp3_in = minimum;
+--- a/libmp3lame/machine.h
++++ b/libmp3lame/machine.h
+@@ -174,11 +174,11 @@
+ 
+ #if 1
+ #define EQ(a,b) (\
+-(fabs(a) > fabs(b)) \
+- ? (fabs((a)-(b)) <= (fabs(a) * 1e-6f)) \
+- : (fabs((a)-(b)) <= (fabs(b) * 1e-6f)))
++(fabs((double)(a)) > fabs((double)(b))) \
++ ? (fabs((double)((a)-(b))) <= (fabs((double)(a)) * 1e-6f)) \
++ : (fabs((double)((a)-(b))) <= (fabs((double)(b)) * 1e-6f)))
+ #else
+-#define EQ(a,b) (fabs((a)-(b))<1E-37)
++#define EQ(a,b) (fabs((double)((a)-(b)))<1E-37)
+ #endif
+ 
+ #define NEQ(a,b) (!EQ(a,b))
+--- a/libmp3lame/presets.c
++++ b/libmp3lame/presets.c
+@@ -33,12 +33,12 @@
+ 
+ #define SET_OPTION(opt, val, def) if (enforce) \
+     (void) lame_set_##opt(gfp, val); \
+-    else if (!(fabs(lame_get_##opt(gfp) - def) > 0)) \
++    else if (!(fabs((double)(lame_get_##opt(gfp) - def)) > 0)) \
+     (void) lame_set_##opt(gfp, val);
+ 
+ #define SET__OPTION(opt, val, def) if (enforce) \
+     lame_set_##opt(gfp, val); \
+-    else if (!(fabs(lame_get_##opt(gfp) - def) > 0)) \
++    else if (!(fabs((double)(lame_get_##opt(gfp) - def)) > 0)) \
+     lame_set_##opt(gfp, val);
+ 
+ #undef Min
+--- a/libmp3lame/psymodel.h
++++ b/libmp3lame/psymodel.h
+@@ -33,7 +33,7 @@
+                           const sample_t *const buffer[2], int gr,
+                           III_psy_ratio ratio[2][2],
+                           III_psy_ratio MS_ratio[2][2],
+-                          FLOAT pe[2], FLOAT pe_MS[2], FLOAT ener[2], int blocktype_d[2]);
++                          FLOAT pe[2], FLOAT pe_MS[2], FLOAT ener[4], int blocktype_d[2]);
+ 
+ 
+ int     psymodel_init(lame_global_flags const* gfp);
+--- a/libmp3lame/quantize_pvt.c
++++ b/libmp3lame/quantize_pvt.c
+@@ -427,7 +427,7 @@
+  * bugfixes rh 8/01: often allocated more than the allowed 4095 bits
+  ************************************************************************/
+ int
+-on_pe(lame_internal_flags * gfc, const FLOAT pe[][2], int targ_bits[2], int mean_bits, int gr, int cbr)
++on_pe(lame_internal_flags * gfc, const FLOAT pe[2][2], int targ_bits[2], int mean_bits, int gr, int cbr)
+ {
+     SessionConfig_t const *const cfg = &gfc->cfg;
+     int     extra_bits = 0, tbits, bits;

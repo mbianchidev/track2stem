@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,22 +17,32 @@ import (
 )
 
 type Job struct {
-	ID             string            `json:"id"`
-	Status         string            `json:"status"` // pending, processing, completed, failed
-	FileName       string            `json:"filename"`
-	CreatedAt      time.Time         `json:"created_at"`
-	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
-	Error          string            `json:"error,omitempty"`
-	OutputFiles    map[string]string `json:"output_files,omitempty"`
-	StemMode       string            `json:"stem_mode,omitempty"`        // "all" or "isolate"
-	IsolateStem    string            `json:"isolate_stem,omitempty"`     // which stem to isolate
-	ProcessingTime string            `json:"processing_time,omitempty"`  // total processing time
-	OutputFormat   string            `json:"output_format,omitempty"`    // mp3, wav, flac
-	Model          string            `json:"model,omitempty"`            // demucs model name
-	Segment        string            `json:"segment,omitempty"`          // segment size for memory management
-	Overlap        string            `json:"overlap,omitempty"`          // overlap between prediction windows
-	Shifts         string            `json:"shifts,omitempty"`           // shift trick for better quality
-	ClipMode       string            `json:"clip_mode,omitempty"`        // rescale or clamp
+	ID             string             `json:"id"`
+	Status         string             `json:"status"` // pending, processing, completed, failed
+	FileName       string             `json:"filename"`
+	CreatedAt      time.Time          `json:"created_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
+	Error          string             `json:"error,omitempty"`
+	OutputFiles    map[string]string  `json:"output_files,omitempty"`
+	StemMode       string             `json:"stem_mode,omitempty"`       // "all" or "isolate"
+	IsolateStem    string             `json:"isolate_stem,omitempty"`    // which stem to isolate
+	ProcessingTime string             `json:"processing_time,omitempty"` // total processing time
+	OutputFormat   string             `json:"output_format,omitempty"`   // mp3, wav, flac
+	Model          string             `json:"model,omitempty"`           // demucs model name
+	Segment        string             `json:"segment,omitempty"`         // segment size for memory management
+	Overlap        string             `json:"overlap,omitempty"`         // overlap between prediction windows
+	Shifts         string             `json:"shifts,omitempty"`          // shift trick for better quality
+	ClipMode       string             `json:"clip_mode,omitempty"`       // rescale or clamp
+	Options        map[string]string  `json:"options,omitempty"`
+	Artifacts      map[string]string  `json:"artifacts,omitempty"`
+	StemFiles      map[string]string  `json:"stem_files,omitempty"`
+	MixStems       []string           `json:"mix_stems,omitempty"`
+	Gains          map[string]float64 `json:"gains,omitempty"`
+	Analysis       json.RawMessage    `json:"analysis,omitempty"`
+	Lyrics         json.RawMessage    `json:"lyrics,omitempty"`
+	VocalSplit     json.RawMessage    `json:"vocal_split,omitempty"`
+	Transcriptions json.RawMessage    `json:"transcriptions,omitempty"`
+	SourceURL      string             `json:"source_url,omitempty"`
 }
 
 var (
@@ -86,8 +93,18 @@ func safeOutputPath(path string) bool {
 	if err != nil {
 		return false
 	}
-	cleaned := filepath.Clean(absPath)
-	return strings.HasPrefix(cleaned, "/app/outputs/")
+	base, err := filepath.Abs(outputFolder())
+	if err != nil {
+		return false
+	}
+	if resolved, err := filepath.EvalSymlinks(base); err == nil {
+		base = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
+		absPath = resolved
+	}
+	relative, err := filepath.Rel(base, absPath)
+	return err == nil && relative != "." && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 func main() {
@@ -96,10 +113,17 @@ func main() {
 		port = "8080"
 	}
 
-	router := mux.NewRouter()
+	if err := os.MkdirAll(uploadFolder(), 0750); err != nil {
+		log.Fatal("Cannot create upload storage: ", err)
+	}
+	router := newRouter()
 
-	// CORS middleware
-	router.Use(corsMiddleware)
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
+}
+
+func newRouter() http.Handler {
+	router := mux.NewRouter()
 
 	// Routes
 	router.HandleFunc("/api/health", healthHandler).Methods("GET")
@@ -109,9 +133,11 @@ func main() {
 	router.HandleFunc("/api/jobs", listJobsHandler).Methods("GET")
 	router.HandleFunc("/api/download/{id}/{stem}", downloadHandler).Methods("GET")
 	router.HandleFunc("/api/processing-status/{id}", processingStatusHandler).Methods("GET")
-
-	log.Printf("Server starting on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	router.HandleFunc("/api/jobs/{id}/mix", mixHandler).Methods("POST")
+	router.HandleFunc("/api/artifacts/{id}/{asset}", artifactHandler).Methods("GET")
+	router.HandleFunc("/api/stems/{id}/{asset}", stemHandler).Methods("GET")
+	router.HandleFunc("/api/import", importHandler).Methods("POST")
+	return corsMiddleware(router)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
@@ -170,11 +196,13 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse multipart form
+	r.Body = http.MaxBytesReader(w, r.Body, 101<<20)
 	err := r.ParseMultipartForm(100 << 20) // 100 MB max
 	if err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
+	defer r.MultipartForm.RemoveAll()
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -182,6 +210,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+	if header.Size > 100<<20 {
+		http.Error(w, "File is too large. Maximum allowed size is 100 MiB.", http.StatusRequestEntityTooLarge)
+		return
+	}
+	extension := strings.ToLower(filepath.Ext(header.Filename))
+	if !map[string]bool{".mp3": true, ".wav": true, ".flac": true, ".ogg": true, ".m4a": true, ".aac": true}[extension] {
+		http.Error(w, "Unsupported audio file type", http.StatusBadRequest)
+		return
+	}
 
 	// Get stem options from form
 	stemMode := r.FormValue("stem_mode")
@@ -234,6 +271,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid clip_mode value", http.StatusBadRequest)
 		return
 	}
+	options := map[string]string{}
+	for _, name := range extraOptionNames {
+		if value := r.FormValue(name); value != "" {
+			options[name] = value
+		}
+	}
+	if err := validateExtraOptions(options, model); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Create job
 	jobID := uuid.New().String()
@@ -251,6 +298,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		Overlap:      overlap,
 		Shifts:       shifts,
 		ClipMode:     clipMode,
+		Options:      options,
 	}
 
 	jobsMutex.Lock()
@@ -258,34 +306,48 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	jobsMutex.Unlock()
 
 	// Save file
-	uploadPath := filepath.Join("/app/uploads", jobID+"_"+safeFilename)
+	uploadPath := filepath.Join(uploadFolder(), jobID+"_"+safeFilename)
 	dst, err := os.Create(uploadPath)
 	if err != nil {
-		job.Status = "failed"
-		job.Error = "Failed to save file"
-		http.Error(w, job.Error, http.StatusInternalServerError)
+		updateJobError(jobID, "Failed to save file")
+		log.Printf("Cannot create upload: %v", err)
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
-	defer dst.Close()
-
 	if _, err := io.Copy(dst, file); err != nil {
-		job.Status = "failed"
-		job.Error = "Failed to save file"
-		http.Error(w, job.Error, http.StatusInternalServerError)
+		dst.Close()
+		os.Remove(uploadPath)
+		updateJobError(jobID, "Failed to save file")
+		log.Printf("Cannot save upload: %v", err)
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
-
-	// Start processing in background
-	go processJob(jobID, uploadPath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode)
+	if err := dst.Close(); err != nil {
+		updateJobError(jobID, "Failed to finish saving file")
+		log.Printf("Cannot finish upload: %v", err)
+		http.Error(w, "Failed to finish saving file", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(job)
+	go processJob(jobID, uploadPath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode)
 }
 
 func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode string) {
+	defer func() {
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Cannot remove owned upload for %s: %v", jobID, err)
+		}
+	}()
 	jobsMutex.Lock()
-	job := jobs[jobID]
+	job, exists := jobs[jobID]
+	if !exists {
+		jobsMutex.Unlock()
+		return
+	}
 	job.Status = "processing"
+	options := job.Options
 	jobsMutex.Unlock()
 
 	// Call processor service
@@ -294,45 +356,21 @@ func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, seg
 		processorURL = "http://localhost:5000"
 	}
 
-	// Open the file
-	file, err := os.Open(filePath)
-	if err != nil {
-		updateJobError(jobID, "Failed to open file")
-		return
+	fields := map[string]string{
+		"job_id": jobID, "stem_mode": stemMode, "isolate_stem": isolateStem,
+		"output_format": outputFormat, "model": model, "shifts": shifts, "clip_mode": clipMode,
 	}
-	defer file.Close()
-
-	// Create multipart form
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
-	if err != nil {
-		updateJobError(jobID, "Failed to create form")
-		return
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		updateJobError(jobID, "Failed to copy file")
-		return
-	}
-
-	// Add job_id, stem options, and advanced options
-	writer.WriteField("job_id", jobID)
-	writer.WriteField("stem_mode", stemMode)
-	writer.WriteField("isolate_stem", isolateStem)
-	writer.WriteField("output_format", outputFormat)
-	writer.WriteField("model", model)
-	writer.WriteField("shifts", shifts)
-	writer.WriteField("clip_mode", clipMode)
 	if segment != "" {
-		writer.WriteField("segment", segment)
+		fields["segment"] = segment
 	}
 	if overlap != "" {
-		writer.WriteField("overlap", overlap)
+		fields["overlap"] = overlap
 	}
-	writer.Close()
+	for name, value := range options {
+		fields[name] = value
+	}
+	body, contentType := streamUpload(filePath, fields)
+	defer body.Close()
 
 	// Send request
 	req, err := http.NewRequest("POST", processorURL+"/process", body)
@@ -340,7 +378,7 @@ func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, seg
 		updateJobError(jobID, "Failed to create request")
 		return
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", contentType)
 
 	client := &http.Client{Timeout: 30 * time.Minute}
 	resp, err := client.Do(req)
@@ -357,33 +395,14 @@ func processJob(jobID, filePath, stemMode, isolateStem, outputFormat, model, seg
 	}
 
 	// Parse response
-	var result map[string]interface{}
+	var result ProcessorResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		updateJobError(jobID, "Failed to parse response")
 		return
 	}
 
 	// Update job
-	jobsMutex.Lock()
-	job.Status = "completed"
-	now := time.Now()
-	job.CompletedAt = &now
-
-	// Extract processing time
-	if processingTime, ok := result["processing_time"].(string); ok {
-		job.ProcessingTime = processingTime
-	}
-
-	// Extract output files
-	if outputs, ok := result["outputs"].(map[string]interface{}); ok {
-		job.OutputFiles = make(map[string]string)
-		for stem, path := range outputs {
-			if pathStr, ok := path.(string); ok {
-				job.OutputFiles[stem] = pathStr
-			}
-		}
-	}
-	jobsMutex.Unlock()
+	completeJob(jobID, result)
 }
 
 func updateJobError(jobID, errMsg string) {
@@ -408,8 +427,8 @@ func getJobHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jobsMutex.RLock()
+	defer jobsMutex.RUnlock()
 	job, exists := jobs[jobID]
-	jobsMutex.RUnlock()
 
 	if !exists {
 		http.Error(w, "Job not found", http.StatusNotFound)
@@ -422,11 +441,11 @@ func getJobHandler(w http.ResponseWriter, r *http.Request) {
 
 func listJobsHandler(w http.ResponseWriter, r *http.Request) {
 	jobsMutex.RLock()
+	defer jobsMutex.RUnlock()
 	jobList := make([]*Job, 0, len(jobs))
 	for _, job := range jobs {
 		jobList = append(jobList, job)
 	}
-	jobsMutex.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(jobList)
@@ -508,21 +527,18 @@ func processingStatusHandler(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(processorURL + "/status/" + jobID)
 	if err != nil {
-		// Return default status if processor is not reachable
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":   "unknown",
-			"progress": 0,
-			"stage":    "Checking status...",
-		})
+		log.Printf("Cannot read processor progress: %v", err)
+		http.Error(w, "Processor progress is unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
 
 	// Forward the response
 	w.Header().Set("Content-Type", "application/json")
-	body, _ := io.ReadAll(resp.Body)
-	w.Write(body)
+	w.WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		log.Printf("Cannot forward processor progress: %v", err)
+	}
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -537,6 +553,12 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	jobsMutex.RLock()
 	job, exists := jobs[jobID]
+	var status, filePath string
+	var fileExists bool
+	if exists {
+		status = job.Status
+		filePath, fileExists = job.OutputFiles[stem]
+	}
 	jobsMutex.RUnlock()
 
 	if !exists {
@@ -544,64 +566,15 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if job.Status != "completed" {
+	if status != "completed" {
 		http.Error(w, "Job not completed", http.StatusBadRequest)
 		return
 	}
 
-	filePath, exists := job.OutputFiles[stem]
-	if !exists {
+	if !fileExists {
 		http.Error(w, "Stem not found", http.StatusNotFound)
 		return
 	}
 
-	// Verify the file path stays within the expected output directory
-	if !safeOutputPath(filePath) {
-		log.Printf("Blocked path traversal attempt in download: %s", filePath)
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
-		return
-	}
-
-	// Check file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		http.Error(w, "File not found on disk", http.StatusNotFound)
-		return
-	}
-
-	// Get the actual filename from the path
-	fileName := filepath.Base(filePath)
-	ext := filepath.Ext(filePath)
-
-	// Determine content type based on file extension
-	contentType := "audio/mpeg" // Default to MP3
-	if ext == ".wav" {
-		contentType = "audio/wav"
-	} else if ext == ".mp3" {
-		contentType = "audio/mpeg"
-	} else if ext == ".flac" {
-		contentType = "audio/flac"
-	}
-
-	// Open the file
-	file, err := os.Open(filePath)
-	if err != nil {
-		http.Error(w, "Failed to open file", http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	// Get file info for size
-	fileInfo, err := file.Stat()
-	if err != nil {
-		http.Error(w, "Failed to get file info", http.StatusInternalServerError)
-		return
-	}
-
-	// Set headers before writing body
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
-
-	// Stream the file
-	io.Copy(w, file)
+	serveOutput(w, r, filePath)
 }

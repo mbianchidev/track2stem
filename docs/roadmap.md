@@ -13,6 +13,6 @@ These are future directions, **not implemented features or delivery commitments*
 
 ## Parallel separation
 
-Application-level segment splitting and parallel workers are a possible future optimization, not a current feature. A design would need to address boundary artifacts, crossfades or overlap-add, additional memory use, CPU contention, cancellation, and reassembly before it could be enabled safely.
+The shared local engine implements bounded CPU segment workers with normalized overlap-add, cancellation checks, and one cached model. See [advanced tuning](usage.md#advanced-tuning) for memory/quality tradeoffs. Distributed workers, a durable queue and GPU execution remain future work.
 
 Discuss proposals through [repository issues](https://github.com/mbianchidev/track2stem/issues) before implementing a substantial change.

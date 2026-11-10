@@ -1,0 +1,33 @@
+#define PLUG_NAME "Track2stem"
+#define PLUG_MFR "Track2stem"
+#define PLUG_VERSION_HEX 0x00000100
+#define PLUG_VERSION_STR "0.1.0"
+#define PLUG_UNIQUE_ID 'T2St'
+#define PLUG_MFR_ID 'T2Sm'
+#define PLUG_URL_STR "https://github.com/mbianchidev/track2stem"
+#define PLUG_EMAIL_STR ""
+#define PLUG_COPYRIGHT_STR "Copyright Track2stem contributors"
+#define PLUG_CLASS_NAME Track2stem
+#define BUNDLE_NAME "Track2stem"
+#define BUNDLE_MFR "track2stem"
+#define BUNDLE_DOMAIN "dev"
+#define SHARED_RESOURCES_SUBPATH "Track2stem"
+#define PLUG_CHANNEL_IO "1-1 2-2"
+#define PLUG_LATENCY 0
+#define PLUG_TYPE 0
+#define PLUG_DOES_MIDI_IN 0
+#define PLUG_DOES_MIDI_OUT 0
+#define PLUG_DOES_MPE 0
+#define PLUG_DOES_STATE_CHUNKS 1
+#define PLUG_HAS_UI 1
+#define PLUG_WIDTH 1100
+#define PLUG_HEIGHT 760
+#define PLUG_FPS 30
+#define PLUG_SHARED_RESOURCES 0
+#define PLUG_HOST_RESIZE 1
+#define AUV2_ENTRY Track2stem_Entry
+#define AUV2_ENTRY_STR "Track2stem_Entry"
+#define AUV2_FACTORY Track2stem_Factory
+#define AUV2_VIEW_CLASS Track2stem_View
+#define AUV2_VIEW_CLASS_STR "Track2stem_View"
+#define VST3_SUBCATEGORY "Fx|Tools"

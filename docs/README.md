@@ -10,6 +10,7 @@
 | [Configuration and operations](configuration.md) | Environment variables, networking, model downloads, startup/shutdown, data retention, and limitations |
 | [Troubleshooting](troubleshooting.md) | Startup, processing, upload, preview, and download problems |
 | [API reference](api.md) | Endpoints, multipart options, job lifecycle, and curl examples |
+| [Native DAW plugin](native-plugin.md) | Apple Silicon VST3/AU installation, Studio Duo evidence, project state, runtime provisioning and licenses |
 
 ## For developers
 

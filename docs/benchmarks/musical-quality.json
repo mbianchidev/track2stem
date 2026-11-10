@@ -1,0 +1,2470 @@
+{
+  "scope": "generated MIDI/SoundFont corpus only; not a general song-quality guarantee",
+  "font_sha256": "9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe",
+  "font_license": "https://github.com/mrbumpy409/GeneralUser-GS/blob/684543d5e5efaef08d02be50dcda8d552478fa60/documentation/LICENSE.txt",
+  "python": "3.14.10",
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "available_cpus": 18,
+  "drums": [
+    {
+      "kit_program": 0,
+      "elapsed_seconds": 3.044102790998295,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 61
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 69
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 28
+        },
+        {
+          "start": 7.01,
+          "end": 7.11,
+          "pitch": 46,
+          "velocity": 33
+        },
+        {
+          "start": 7.41,
+          "end": 7.51,
+          "pitch": 46,
+          "velocity": 1
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 49
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 57
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 59
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 54
+        },
+        {
+          "start": 17.01,
+          "end": 17.11,
+          "pitch": 49,
+          "velocity": 53
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 33
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 0.9090909090909091,
+      "recall": 1.0,
+      "f1": 0.9523809523809523,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "38": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "41": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "47": {
+          "true": 2,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "49": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "kit_program": 8,
+      "elapsed_seconds": 2.0872852918691933,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.01,
+          "end": 1.11,
+          "pitch": 36,
+          "velocity": 61
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 60
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 33
+        },
+        {
+          "start": 7.01,
+          "end": 7.11,
+          "pitch": 46,
+          "velocity": 32
+        },
+        {
+          "start": 7.44,
+          "end": 7.54,
+          "pitch": 46,
+          "velocity": 5
+        },
+        {
+          "start": 9.01,
+          "end": 9.11,
+          "pitch": 36,
+          "velocity": 59
+        },
+        {
+          "start": 9.01,
+          "end": 9.11,
+          "pitch": 38,
+          "velocity": 59
+        },
+        {
+          "start": 11.01,
+          "end": 11.11,
+          "pitch": 41,
+          "velocity": 64
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 41,
+          "velocity": 61
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 41,
+          "velocity": 63
+        },
+        {
+          "start": 17.01,
+          "end": 17.11,
+          "pitch": 49,
+          "velocity": 53
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 33
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 0.5,
+      "recall": 0.6,
+      "f1": 0.5454545454545454,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "38": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "41": {
+          "true": 0,
+          "false": 3,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "47": {
+          "true": 0,
+          "false": 0,
+          "missing": 2,
+          "f1": 0.0
+        },
+        "49": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 0,
+          "false": 0,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "kit_program": 16,
+      "elapsed_seconds": 2.071781416190788,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 60
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 80
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 32
+        },
+        {
+          "start": 7.01,
+          "end": 7.11,
+          "pitch": 46,
+          "velocity": 35
+        },
+        {
+          "start": 9.01,
+          "end": 9.11,
+          "pitch": 41,
+          "velocity": 59
+        },
+        {
+          "start": 11.01,
+          "end": 11.11,
+          "pitch": 47,
+          "velocity": 64
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 61
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 63
+        },
+        {
+          "start": 17.01,
+          "end": 17.11,
+          "pitch": 49,
+          "velocity": 51
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 29
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "38": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "41": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "47": {
+          "true": 2,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "49": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    }
+  ],
+  "sections": {
+    "scope": "generated arrangement with known instrument activity; not a natural-song accuracy claim",
+    "stem_source": "rendered reference stems",
+    "reference": [
+      {
+        "start": 0,
+        "end": 8,
+        "label": "Intro"
+      },
+      {
+        "start": 8,
+        "end": 24,
+        "label": "Verse"
+      },
+      {
+        "start": 24,
+        "end": 40,
+        "label": "Chorus"
+      },
+      {
+        "start": 40,
+        "end": 56,
+        "label": "Verse"
+      },
+      {
+        "start": 56,
+        "end": 72,
+        "label": "Chorus"
+      },
+      {
+        "start": 72,
+        "end": 88,
+        "label": "Bridge"
+      },
+      {
+        "start": 88,
+        "end": 104,
+        "label": "Solo"
+      },
+      {
+        "start": 104,
+        "end": 120,
+        "label": "Chorus"
+      },
+      {
+        "start": 120,
+        "end": 128,
+        "label": "Outro"
+      }
+    ],
+    "predicted": [
+      {
+        "start": 0,
+        "end": 8.0,
+        "label": "Intro",
+        "group": "A",
+        "confidence": 0.65
+      },
+      {
+        "start": 8.0,
+        "end": 24.0,
+        "label": "Verse",
+        "group": "B",
+        "confidence": 0.6
+      },
+      {
+        "start": 24.0,
+        "end": 40.0,
+        "label": "Chorus",
+        "group": "C",
+        "confidence": 0.7
+      },
+      {
+        "start": 40.0,
+        "end": 56.0,
+        "label": "Verse",
+        "group": "B",
+        "confidence": 0.6
+      },
+      {
+        "start": 56.0,
+        "end": 72.0,
+        "label": "Chorus",
+        "group": "C",
+        "confidence": 0.7
+      },
+      {
+        "start": 72.0,
+        "end": 88.0,
+        "label": "Bridge",
+        "group": "D",
+        "confidence": 0.55
+      },
+      {
+        "start": 88.0,
+        "end": 104.0,
+        "label": "Solo",
+        "group": "E",
+        "confidence": 0.6
+      },
+      {
+        "start": 104.0,
+        "end": 120.0,
+        "label": "Chorus",
+        "group": "C",
+        "confidence": 0.7
+      },
+      {
+        "start": 120.0,
+        "end": 128.0,
+        "label": "Outro",
+        "group": "F",
+        "confidence": 0.65
+      }
+    ],
+    "boundary_metrics": {
+      "tolerance_seconds": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "per_class": {
+        "0": {
+          "true": 8,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    "time_weighted_label_accuracy": 1.0,
+    "per_label": {
+      "Verse": {
+        "correct_seconds": 32.0,
+        "reference_seconds": 32.0,
+        "recall": 1.0
+      },
+      "Outro": {
+        "correct_seconds": 8.0,
+        "reference_seconds": 8.0,
+        "recall": 1.0
+      },
+      "Intro": {
+        "correct_seconds": 8.0,
+        "reference_seconds": 8.0,
+        "recall": 1.0
+      },
+      "Chorus": {
+        "correct_seconds": 48.0,
+        "reference_seconds": 48.0,
+        "recall": 1.0
+      },
+      "Bridge": {
+        "correct_seconds": 16.0,
+        "reference_seconds": 16.0,
+        "recall": 1.0
+      },
+      "Solo": {
+        "correct_seconds": 16.0,
+        "reference_seconds": 16.0,
+        "recall": 1.0
+      }
+    },
+    "end_to_end": {
+      "scope": "generated arrangement with known instrument activity; not a natural-song accuracy claim",
+      "stem_source": "htdemucs_6s inference",
+      "reference": [
+        {
+          "start": 0,
+          "end": 8,
+          "label": "Intro"
+        },
+        {
+          "start": 8,
+          "end": 24,
+          "label": "Verse"
+        },
+        {
+          "start": 24,
+          "end": 40,
+          "label": "Chorus"
+        },
+        {
+          "start": 40,
+          "end": 56,
+          "label": "Verse"
+        },
+        {
+          "start": 56,
+          "end": 72,
+          "label": "Chorus"
+        },
+        {
+          "start": 72,
+          "end": 88,
+          "label": "Bridge"
+        },
+        {
+          "start": 88,
+          "end": 104,
+          "label": "Solo"
+        },
+        {
+          "start": 104,
+          "end": 120,
+          "label": "Chorus"
+        },
+        {
+          "start": 120,
+          "end": 128,
+          "label": "Outro"
+        }
+      ],
+      "predicted": [
+        {
+          "start": 0,
+          "end": 8.0,
+          "label": "Intro",
+          "group": "A",
+          "confidence": 0.65
+        },
+        {
+          "start": 8.0,
+          "end": 24.0,
+          "label": "Verse",
+          "group": "B",
+          "confidence": 0.6
+        },
+        {
+          "start": 24.0,
+          "end": 40.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 40.0,
+          "end": 56.0,
+          "label": "Verse",
+          "group": "B",
+          "confidence": 0.6
+        },
+        {
+          "start": 56.0,
+          "end": 72.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 72.0,
+          "end": 88.0,
+          "label": "Solo",
+          "group": "D",
+          "confidence": 0.6
+        },
+        {
+          "start": 88.0,
+          "end": 104.0,
+          "label": "Solo",
+          "group": "E",
+          "confidence": 0.6
+        },
+        {
+          "start": 104.0,
+          "end": 120.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 120.0,
+          "end": 128.0,
+          "label": "Outro",
+          "group": "F",
+          "confidence": 0.65
+        }
+      ],
+      "boundary_metrics": {
+        "tolerance_seconds": 1,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "per_class": {
+          "0": {
+            "true": 8,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          }
+        }
+      },
+      "time_weighted_label_accuracy": 0.875,
+      "per_label": {
+        "Verse": {
+          "correct_seconds": 32.0,
+          "reference_seconds": 32.0,
+          "recall": 1.0
+        },
+        "Outro": {
+          "correct_seconds": 8.0,
+          "reference_seconds": 8.0,
+          "recall": 1.0
+        },
+        "Intro": {
+          "correct_seconds": 8.0,
+          "reference_seconds": 8.0,
+          "recall": 1.0
+        },
+        "Chorus": {
+          "correct_seconds": 48.0,
+          "reference_seconds": 48.0,
+          "recall": 1.0
+        },
+        "Bridge": {
+          "correct_seconds": 0.0,
+          "reference_seconds": 16.0,
+          "recall": 0.0
+        },
+        "Solo": {
+          "correct_seconds": 16.0,
+          "reference_seconds": 16.0,
+          "recall": 1.0
+        }
+      }
+    },
+    "holdout": {
+      "scope": "generated arrangement with known instrument activity; not a natural-song accuracy claim",
+      "stem_source": "rendered reference stems",
+      "reference": [
+        {
+          "start": 0,
+          "end": 6,
+          "label": "Intro"
+        },
+        {
+          "start": 6,
+          "end": 18,
+          "label": "Verse"
+        },
+        {
+          "start": 18,
+          "end": 30,
+          "label": "Chorus"
+        },
+        {
+          "start": 30,
+          "end": 42,
+          "label": "Verse"
+        },
+        {
+          "start": 42,
+          "end": 54,
+          "label": "Chorus"
+        },
+        {
+          "start": 54,
+          "end": 62,
+          "label": "Bridge"
+        },
+        {
+          "start": 62,
+          "end": 72,
+          "label": "Solo"
+        },
+        {
+          "start": 72,
+          "end": 84,
+          "label": "Chorus"
+        },
+        {
+          "start": 84,
+          "end": 90,
+          "label": "Outro"
+        }
+      ],
+      "predicted": [
+        {
+          "start": 0,
+          "end": 6.0,
+          "label": "Intro",
+          "group": "A",
+          "confidence": 0.65
+        },
+        {
+          "start": 6.0,
+          "end": 18.0,
+          "label": "Verse",
+          "group": "B",
+          "confidence": 0.6
+        },
+        {
+          "start": 18.0,
+          "end": 30.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 30.0,
+          "end": 42.0,
+          "label": "Verse",
+          "group": "B",
+          "confidence": 0.6
+        },
+        {
+          "start": 42.0,
+          "end": 54.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 54.0,
+          "end": 62.0,
+          "label": "Bridge",
+          "group": "D",
+          "confidence": 0.55
+        },
+        {
+          "start": 62.0,
+          "end": 72.0,
+          "label": "Bridge",
+          "group": "E",
+          "confidence": 0.55
+        },
+        {
+          "start": 72.0,
+          "end": 84.0,
+          "label": "Chorus",
+          "group": "C",
+          "confidence": 0.7
+        },
+        {
+          "start": 84.0,
+          "end": 90.0,
+          "label": "Outro",
+          "group": "F",
+          "confidence": 0.65
+        }
+      ],
+      "boundary_metrics": {
+        "tolerance_seconds": 1,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "per_class": {
+          "0": {
+            "true": 8,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          }
+        }
+      },
+      "time_weighted_label_accuracy": 0.8888888888888888,
+      "per_label": {
+        "Verse": {
+          "correct_seconds": 24.0,
+          "reference_seconds": 24.0,
+          "recall": 1.0
+        },
+        "Outro": {
+          "correct_seconds": 6.0,
+          "reference_seconds": 6.0,
+          "recall": 1.0
+        },
+        "Intro": {
+          "correct_seconds": 6.0,
+          "reference_seconds": 6.0,
+          "recall": 1.0
+        },
+        "Chorus": {
+          "correct_seconds": 36.0,
+          "reference_seconds": 36.0,
+          "recall": 1.0
+        },
+        "Bridge": {
+          "correct_seconds": 8.0,
+          "reference_seconds": 8.0,
+          "recall": 1.0
+        },
+        "Solo": {
+          "correct_seconds": 0.0,
+          "reference_seconds": 10.0,
+          "recall": 0.0
+        }
+      },
+      "end_to_end": {
+        "scope": "generated arrangement with known instrument activity; not a natural-song accuracy claim",
+        "stem_source": "htdemucs_6s inference",
+        "reference": [
+          {
+            "start": 0,
+            "end": 6,
+            "label": "Intro"
+          },
+          {
+            "start": 6,
+            "end": 18,
+            "label": "Verse"
+          },
+          {
+            "start": 18,
+            "end": 30,
+            "label": "Chorus"
+          },
+          {
+            "start": 30,
+            "end": 42,
+            "label": "Verse"
+          },
+          {
+            "start": 42,
+            "end": 54,
+            "label": "Chorus"
+          },
+          {
+            "start": 54,
+            "end": 62,
+            "label": "Bridge"
+          },
+          {
+            "start": 62,
+            "end": 72,
+            "label": "Solo"
+          },
+          {
+            "start": 72,
+            "end": 84,
+            "label": "Chorus"
+          },
+          {
+            "start": 84,
+            "end": 90,
+            "label": "Outro"
+          }
+        ],
+        "predicted": [
+          {
+            "start": 0,
+            "end": 6.0,
+            "label": "Intro",
+            "group": "A",
+            "confidence": 0.65
+          },
+          {
+            "start": 6.0,
+            "end": 18.0,
+            "label": "Verse",
+            "group": "B",
+            "confidence": 0.6
+          },
+          {
+            "start": 18.0,
+            "end": 30.0,
+            "label": "Chorus",
+            "group": "C",
+            "confidence": 0.7
+          },
+          {
+            "start": 30.0,
+            "end": 42.0,
+            "label": "Verse",
+            "group": "B",
+            "confidence": 0.6
+          },
+          {
+            "start": 42.0,
+            "end": 54.0,
+            "label": "Chorus",
+            "group": "C",
+            "confidence": 0.7
+          },
+          {
+            "start": 54.0,
+            "end": 62.0,
+            "label": "Bridge",
+            "group": "D",
+            "confidence": 0.55
+          },
+          {
+            "start": 62.0,
+            "end": 72.0,
+            "label": "Bridge",
+            "group": "E",
+            "confidence": 0.55
+          },
+          {
+            "start": 72.0,
+            "end": 84.0,
+            "label": "Chorus",
+            "group": "C",
+            "confidence": 0.7
+          },
+          {
+            "start": 84.0,
+            "end": 90.0,
+            "label": "Outro",
+            "group": "F",
+            "confidence": 0.65
+          }
+        ],
+        "boundary_metrics": {
+          "tolerance_seconds": 1,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "per_class": {
+            "0": {
+              "true": 8,
+              "false": 0,
+              "missing": 0,
+              "f1": 1.0
+            }
+          }
+        },
+        "time_weighted_label_accuracy": 0.8888888888888888,
+        "per_label": {
+          "Verse": {
+            "correct_seconds": 24.0,
+            "reference_seconds": 24.0,
+            "recall": 1.0
+          },
+          "Outro": {
+            "correct_seconds": 6.0,
+            "reference_seconds": 6.0,
+            "recall": 1.0
+          },
+          "Intro": {
+            "correct_seconds": 6.0,
+            "reference_seconds": 6.0,
+            "recall": 1.0
+          },
+          "Chorus": {
+            "correct_seconds": 36.0,
+            "reference_seconds": 36.0,
+            "recall": 1.0
+          },
+          "Bridge": {
+            "correct_seconds": 8.0,
+            "reference_seconds": 8.0,
+            "recall": 1.0
+          },
+          "Solo": {
+            "correct_seconds": 0.0,
+            "reference_seconds": 10.0,
+            "recall": 0.0
+          }
+        }
+      }
+    }
+  },
+  "schema": 1,
+  "baseline_drums": [
+    {
+      "kit_program": 0,
+      "elapsed_seconds": 1.4087310421746224,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 61
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 69
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 28
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 49,
+          "velocity": 33
+        },
+        {
+          "start": 7.4,
+          "end": 7.5,
+          "pitch": 49,
+          "velocity": 1
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 49
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 41,
+          "velocity": 59
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 33
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 0.625,
+      "recall": 0.5,
+      "f1": 0.5555555555555556,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "38": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "41": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 0,
+          "false": 0,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "47": {
+          "true": 0,
+          "false": 0,
+          "missing": 2,
+          "f1": 0.0
+        },
+        "49": {
+          "true": 0,
+          "false": 2,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "50": {
+          "true": 0,
+          "false": 0,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "kit_program": 8,
+      "elapsed_seconds": 1.2904413749929518,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 61
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 60
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 33
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 35
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 36,
+          "velocity": 59
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 41,
+          "velocity": 64
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 41,
+          "velocity": 66
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 41,
+          "velocity": 63
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 53
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 33
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 0.6,
+      "recall": 0.6,
+      "f1": 0.6,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "38": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "41": {
+          "true": 0,
+          "false": 3,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "47": {
+          "true": 0,
+          "false": 0,
+          "missing": 2,
+          "f1": 0.0
+        },
+        "49": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 0,
+          "false": 0,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "kit_program": 16,
+      "elapsed_seconds": 1.2924642500001937,
+      "reference": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 100
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 100
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 100
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 100
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 41,
+          "velocity": 100
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 47,
+          "velocity": 100
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 50,
+          "velocity": 100
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 100
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 100
+        }
+      ],
+      "predicted": [
+        {
+          "start": 1.0,
+          "end": 1.1,
+          "pitch": 36,
+          "velocity": 60
+        },
+        {
+          "start": 3.0,
+          "end": 3.1,
+          "pitch": 38,
+          "velocity": 80
+        },
+        {
+          "start": 5.0,
+          "end": 5.1,
+          "pitch": 42,
+          "velocity": 32
+        },
+        {
+          "start": 7.0,
+          "end": 7.1,
+          "pitch": 46,
+          "velocity": 35
+        },
+        {
+          "start": 7.45,
+          "end": 7.55,
+          "pitch": 46,
+          "velocity": 12
+        },
+        {
+          "start": 9.0,
+          "end": 9.1,
+          "pitch": 36,
+          "velocity": 59
+        },
+        {
+          "start": 11.0,
+          "end": 11.1,
+          "pitch": 41,
+          "velocity": 64
+        },
+        {
+          "start": 13.0,
+          "end": 13.1,
+          "pitch": 41,
+          "velocity": 61
+        },
+        {
+          "start": 15.0,
+          "end": 15.1,
+          "pitch": 41,
+          "velocity": 63
+        },
+        {
+          "start": 17.0,
+          "end": 17.1,
+          "pitch": 49,
+          "velocity": 51
+        },
+        {
+          "start": 19.0,
+          "end": 19.1,
+          "pitch": 51,
+          "velocity": 29
+        }
+      ],
+      "tolerance_seconds": 0.05,
+      "precision": 0.5454545454545454,
+      "recall": 0.6,
+      "f1": 0.5714285714285714,
+      "per_class": {
+        "36": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "38": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "41": {
+          "true": 0,
+          "false": 3,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "42": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "46": {
+          "true": 1,
+          "false": 1,
+          "missing": 0,
+          "f1": 0.6666666666666666
+        },
+        "47": {
+          "true": 0,
+          "false": 0,
+          "missing": 2,
+          "f1": 0.0
+        },
+        "49": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 0,
+          "false": 0,
+          "missing": 1,
+          "f1": 0.0
+        },
+        "51": {
+          "true": 1,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    }
+  ],
+  "baseline_sections": {
+    "scope": "generated arrangement with known instrument activity; not a natural-song accuracy claim",
+    "reference": [
+      {
+        "start": 0,
+        "end": 8,
+        "label": "Intro"
+      },
+      {
+        "start": 8,
+        "end": 24,
+        "label": "Verse"
+      },
+      {
+        "start": 24,
+        "end": 40,
+        "label": "Chorus"
+      },
+      {
+        "start": 40,
+        "end": 56,
+        "label": "Verse"
+      },
+      {
+        "start": 56,
+        "end": 72,
+        "label": "Chorus"
+      },
+      {
+        "start": 72,
+        "end": 88,
+        "label": "Bridge"
+      },
+      {
+        "start": 88,
+        "end": 104,
+        "label": "Solo"
+      },
+      {
+        "start": 104,
+        "end": 120,
+        "label": "Chorus"
+      },
+      {
+        "start": 120,
+        "end": 128,
+        "label": "Outro"
+      }
+    ],
+    "predicted": [
+      {
+        "start": 0,
+        "end": 7.988,
+        "label": "Intro",
+        "confidence": 0.3
+      },
+      {
+        "start": 7.988,
+        "end": 15.975,
+        "label": "Verse",
+        "confidence": 0.55
+      },
+      {
+        "start": 15.975,
+        "end": 27.957,
+        "label": "Chorus",
+        "confidence": 0.55
+      },
+      {
+        "start": 27.957,
+        "end": 47.926,
+        "label": "Chorus",
+        "confidence": 0.55
+      },
+      {
+        "start": 47.926,
+        "end": 59.907,
+        "label": "Verse",
+        "confidence": 0.55
+      },
+      {
+        "start": 59.907,
+        "end": 77.88,
+        "label": "Chorus",
+        "confidence": 0.55
+      },
+      {
+        "start": 77.88,
+        "end": 85.867,
+        "label": "Verse",
+        "confidence": 0.55
+      },
+      {
+        "start": 85.867,
+        "end": 95.852,
+        "label": "Solo",
+        "confidence": 0.3
+      },
+      {
+        "start": 95.852,
+        "end": 107.833,
+        "label": "Solo",
+        "confidence": 0.3
+      },
+      {
+        "start": 107.833,
+        "end": 121.812,
+        "label": "Chorus",
+        "confidence": 0.55
+      },
+      {
+        "start": 121.812,
+        "end": 128.0,
+        "label": "Outro",
+        "confidence": 0.3
+      }
+    ],
+    "boundary_metrics": {
+      "tolerance_seconds": 1,
+      "precision": 0.1,
+      "recall": 0.125,
+      "f1": 0.1111111111111111,
+      "per_class": {
+        "0": {
+          "true": 1,
+          "false": 9,
+          "missing": 7,
+          "f1": 0.1111111111111111
+        }
+      }
+    },
+    "time_weighted_label_accuracy": 0.6756640625
+  },
+  "timing_scope": "Musical-quality elapsed times include startup and concurrent packaging work; use the separate isolated CPU report for performance comparisons.",
+  "pitched": [
+    {
+      "case": "clean",
+      "instrument": "guitar",
+      "scope": "rendered reference stem, not separation-plus-transcription accuracy",
+      "raw_candidates": 424,
+      "selected_notes": 424,
+      "unassigned_fingerings": 0,
+      "invalid_assigned_pitches": 0,
+      "onset_alignment": {
+        "method": "Acoustic backtracking of delayed attacks, bounded to 150 ms",
+        "merged_unsupported_reattacks": 0
+      },
+      "raw_candidate_metrics": {
+        "tolerance_seconds": 0.05,
+        "precision": 0.8490566037735849,
+        "recall": 1.0,
+        "f1": 0.9183673469387755,
+        "per_class": {
+          "41": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "43": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "45": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "48": {
+            "true": 60,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "50": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "52": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "53": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "55": {
+            "true": 64,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "57": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "60": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "62": {
+            "true": 0,
+            "false": 32,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "67": {
+            "true": 0,
+            "false": 32,
+            "missing": 0,
+            "f1": 0.0
+          }
+        }
+      },
+      "tolerance_seconds": 0.05,
+      "precision": 0.8490566037735849,
+      "recall": 1.0,
+      "f1": 0.9183673469387755,
+      "per_class": {
+        "41": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "43": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "45": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "48": {
+          "true": 60,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "50": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "52": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "53": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "55": {
+          "true": 64,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "57": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "60": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "62": {
+          "true": 0,
+          "false": 32,
+          "missing": 0,
+          "f1": 0.0
+        },
+        "67": {
+          "true": 0,
+          "false": 32,
+          "missing": 0,
+          "f1": 0.0
+        }
+      }
+    },
+    {
+      "case": "clean",
+      "instrument": "bass",
+      "scope": "rendered reference stem, not separation-plus-transcription accuracy",
+      "raw_candidates": 263,
+      "selected_notes": 120,
+      "unassigned_fingerings": 0,
+      "invalid_assigned_pitches": 0,
+      "onset_alignment": {
+        "method": "Neural note timing preserved for bass",
+        "merged_unsupported_reattacks": 0
+      },
+      "raw_candidate_metrics": {
+        "tolerance_seconds": 0.05,
+        "precision": 0.44106463878326996,
+        "recall": 0.9666666666666667,
+        "f1": 0.6057441253263708,
+        "per_class": {
+          "29": {
+            "true": 27,
+            "false": 1,
+            "missing": 1,
+            "f1": 0.9642857142857143
+          },
+          "31": {
+            "true": 29,
+            "false": 3,
+            "missing": 3,
+            "f1": 0.90625
+          },
+          "33": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "36": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "41": {
+            "true": 0,
+            "false": 28,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "43": {
+            "true": 0,
+            "false": 32,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "45": {
+            "true": 0,
+            "false": 28,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "48": {
+            "true": 0,
+            "false": 49,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "57": {
+            "true": 0,
+            "false": 6,
+            "missing": 0,
+            "f1": 0.0
+          }
+        }
+      },
+      "tolerance_seconds": 0.05,
+      "precision": 0.9666666666666667,
+      "recall": 0.9666666666666667,
+      "f1": 0.9666666666666667,
+      "per_class": {
+        "29": {
+          "true": 27,
+          "false": 1,
+          "missing": 1,
+          "f1": 0.9642857142857143
+        },
+        "31": {
+          "true": 29,
+          "false": 3,
+          "missing": 3,
+          "f1": 0.90625
+        },
+        "33": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "36": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "case": "metal",
+      "instrument": "guitar",
+      "scope": "rendered reference stem, not separation-plus-transcription accuracy",
+      "raw_candidates": 475,
+      "selected_notes": 377,
+      "unassigned_fingerings": 1,
+      "invalid_assigned_pitches": 0,
+      "onset_alignment": {
+        "method": "Acoustic backtracking of delayed attacks, bounded to 150 ms",
+        "merged_unsupported_reattacks": 98
+      },
+      "raw_candidate_metrics": {
+        "tolerance_seconds": 0.05,
+        "precision": 0.47368421052631576,
+        "recall": 0.625,
+        "f1": 0.5389221556886228,
+        "per_class": {
+          "41": {
+            "true": 27,
+            "false": 25,
+            "missing": 1,
+            "f1": 0.675
+          },
+          "43": {
+            "true": 4,
+            "false": 30,
+            "missing": 28,
+            "f1": 0.12121212121212122
+          },
+          "45": {
+            "true": 28,
+            "false": 22,
+            "missing": 0,
+            "f1": 0.717948717948718
+          },
+          "48": {
+            "true": 3,
+            "false": 111,
+            "missing": 57,
+            "f1": 0.034482758620689655
+          },
+          "50": {
+            "true": 11,
+            "false": 32,
+            "missing": 21,
+            "f1": 0.29333333333333333
+          },
+          "52": {
+            "true": 0,
+            "false": 29,
+            "missing": 28,
+            "f1": 0.0
+          },
+          "53": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "55": {
+            "true": 64,
+            "false": 1,
+            "missing": 0,
+            "f1": 0.9922480620155039
+          },
+          "57": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "60": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          }
+        }
+      },
+      "tolerance_seconds": 0.05,
+      "precision": 0.9071618037135278,
+      "recall": 0.95,
+      "f1": 0.9280868385345997,
+      "per_class": {
+        "41": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "43": {
+          "true": 32,
+          "false": 2,
+          "missing": 0,
+          "f1": 0.9696969696969697
+        },
+        "45": {
+          "true": 28,
+          "false": 7,
+          "missing": 0,
+          "f1": 0.8888888888888888
+        },
+        "48": {
+          "true": 55,
+          "false": 13,
+          "missing": 5,
+          "f1": 0.859375
+        },
+        "50": {
+          "true": 29,
+          "false": 3,
+          "missing": 3,
+          "f1": 0.90625
+        },
+        "52": {
+          "true": 18,
+          "false": 10,
+          "missing": 10,
+          "f1": 0.6428571428571429
+        },
+        "53": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "55": {
+          "true": 64,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "57": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "60": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    },
+    {
+      "case": "metal",
+      "instrument": "bass",
+      "scope": "rendered reference stem, not separation-plus-transcription accuracy",
+      "raw_candidates": 263,
+      "selected_notes": 120,
+      "unassigned_fingerings": 0,
+      "invalid_assigned_pitches": 0,
+      "onset_alignment": {
+        "method": "Neural note timing preserved for bass",
+        "merged_unsupported_reattacks": 0
+      },
+      "raw_candidate_metrics": {
+        "tolerance_seconds": 0.05,
+        "precision": 0.44106463878326996,
+        "recall": 0.9666666666666667,
+        "f1": 0.6057441253263708,
+        "per_class": {
+          "29": {
+            "true": 27,
+            "false": 1,
+            "missing": 1,
+            "f1": 0.9642857142857143
+          },
+          "31": {
+            "true": 29,
+            "false": 3,
+            "missing": 3,
+            "f1": 0.90625
+          },
+          "33": {
+            "true": 28,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "36": {
+            "true": 32,
+            "false": 0,
+            "missing": 0,
+            "f1": 1.0
+          },
+          "41": {
+            "true": 0,
+            "false": 28,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "43": {
+            "true": 0,
+            "false": 32,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "45": {
+            "true": 0,
+            "false": 28,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "48": {
+            "true": 0,
+            "false": 49,
+            "missing": 0,
+            "f1": 0.0
+          },
+          "57": {
+            "true": 0,
+            "false": 6,
+            "missing": 0,
+            "f1": 0.0
+          }
+        }
+      },
+      "tolerance_seconds": 0.05,
+      "precision": 0.9666666666666667,
+      "recall": 0.9666666666666667,
+      "f1": 0.9666666666666667,
+      "per_class": {
+        "29": {
+          "true": 27,
+          "false": 1,
+          "missing": 1,
+          "f1": 0.9642857142857143
+        },
+        "31": {
+          "true": 29,
+          "false": 3,
+          "missing": 3,
+          "f1": 0.90625
+        },
+        "33": {
+          "true": 28,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        },
+        "36": {
+          "true": 32,
+          "false": 0,
+          "missing": 0,
+          "f1": 1.0
+        }
+      }
+    }
+  ]
+}

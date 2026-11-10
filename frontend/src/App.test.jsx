@@ -59,6 +59,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     savedState.clear();
+    localStorageMock.setItem.mockImplementation((key, value) => savedState.set(key, String(value)));
     axios.get.mockReset().mockResolvedValue({ data: [] });
     axios.post.mockReset().mockResolvedValue({ data: makeJob() });
     axios.delete.mockReset().mockResolvedValue({ data: { status: 'deleted' } });
@@ -172,7 +173,7 @@ describe('App', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(document.getElementById(toggle.getAttribute('aria-controls'))).toBeVisible();
-    fireEvent.change(screen.getByLabelText('Segment size'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Segment size'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('Overlap'), { target: { value: '0.5' } });
     fireEvent.change(screen.getByLabelText('Shifts (quality)'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Clip mode'), { target: { value: 'clamp' } });
@@ -183,12 +184,30 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Choose stem to isolate'), { target: { value: 'drums' } });
     chooseFile();
     const formData = await uploadFile();
-    expect(formData.get('segment')).toBe('8');
+    expect(formData.get('segment')).toBe('7');
     expect(formData.get('overlap')).toBe('0.5');
     expect(formData.get('shifts')).toBe('2');
     expect(formData.get('clip_mode')).toBe('clamp');
     expect(formData.get('stem_mode')).toBe('isolate');
     expect(formData.get('isolate_stem')).toBe('drums');
+  });
+
+  test('bounds fast-profile memory and restores the six-stem defaults', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: /Advanced tuning/i }));
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'fast' } });
+    expect(screen.getByLabelText('Segment size')).toHaveValue('7');
+    expect(screen.getByLabelText('CPU profile')).toHaveValue('fast');
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'six' } });
+    expect(screen.getByLabelText('Segment size')).toHaveValue('');
+    expect(screen.getByLabelText('AI model')).toHaveValue('htdemucs_6s');
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'fast' } });
+    chooseFile();
+    const formData = await uploadFile();
+    expect(formData.get('model')).toBe('hdemucs_mmi');
+    expect(formData.get('segment')).toBe('7');
+    expect(formData.get('overlap')).toBe('0.1');
+    expect(formData.get('shifts')).toBe('0');
   });
 
   test('disables editable controls during upload and exposes actual upload progress', async () => {
@@ -322,6 +341,19 @@ describe('App', () => {
     expect(within(screen.getByRole('region', { name: 'Recent jobs' })).getByText('synthetic-demo.wav')).toBeInTheDocument();
   });
 
+  test('keeps downloads usable when browser or DAW metadata storage is full', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({
+      status: 'completed', output_files: { vocals: '/synthetic/vocals.wav' },
+    })));
+    vi.spyOn(localStorageMock, 'setItem').mockImplementation(() => {
+      throw new DOMException('Synthetic storage limit', 'QuotaExceededError');
+    });
+    await renderApp();
+    expect(screen.getByRole('alert')).toHaveTextContent(/metadata could not be saved/i);
+    expect(screen.getByRole('button', { name: 'Download vocals', exact: true })).toBeEnabled();
+  });
+
   test.each(['status', 'progress'])('reports a transient %s failure and recovers on the next poll', async (endpoint) => {
     vi.useFakeTimers();
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -348,5 +380,92 @@ describe('App', () => {
     await act(async () => vi.advanceTimersByTimeAsync(2000));
     expect(screen.queryByText(message)).not.toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Separation progress' })).toHaveAttribute('value', '12');
+  });
+
+  test('submits local practice tools and bounded parallel workers', async () => {
+    await renderApp();
+    chooseFile();
+    for (const name of ['Tempo, key & song sections', 'Click track', 'Lyrics', 'Guitar tabs', 'Bass tabs', 'Drum tabs & MIDI', 'Lead / backing vocals']) {
+      fireEvent.click(screen.getByRole('checkbox', { name }));
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Advanced tuning/i }));
+    fireEvent.change(screen.getByLabelText('Parallel CPU workers'), { target: { value: '2' } });
+    const formData = await uploadFile();
+    for (const name of ['analysis', 'click_track', 'lyrics', 'guitar_tabs', 'bass_tabs', 'drum_tabs', 'split_vocals']) {
+      expect(formData.get(name)).toBe('true');
+    }
+    expect(formData.get('workers')).toBe('2');
+  });
+
+  test('cancels the current running job without requiring a history entry', async () => {
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({ status: 'processing' })));
+    await renderApp();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    expect(axios.delete).toHaveBeenCalledWith('/api/jobs/synthetic-job');
+    expect(screen.getByText('No stems yet')).toBeInTheDocument();
+    expect(savedState.has('track2stem_current_job')).toBe(false);
+  });
+
+  test('does not restore a cancelled job when an older status request finishes late', async () => {
+    vi.useFakeTimers();
+    const job = makeJob({ status: 'processing' });
+    savedState.set('track2stem_current_job', JSON.stringify(job));
+    let finishStatus;
+    axios.get.mockImplementation((url) => {
+      if (url === '/api/jobs') return Promise.resolve({ data: [] });
+      if (url.includes('processing-status')) return Promise.resolve({ data: { progress: 10 } });
+      return new Promise((resolve) => { finishStatus = resolve; });
+    });
+    await renderApp();
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    await act(async () => finishStatus({ data: job }));
+    expect(screen.getByText('No stems yet')).toBeInTheDocument();
+    expect(savedState.has('track2stem_current_job')).toBe(false);
+  });
+
+  test('retains the current job when cancellation fails so it can be retried', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    axios.delete.mockRejectedValue(new Error('Synthetic connection failure'));
+    savedState.set('track2stem_current_job', JSON.stringify(makeJob({ status: 'processing' })));
+    await renderApp();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel job' })));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not cancel this job');
+    expect(screen.getByRole('button', { name: 'Cancel job' })).toBeEnabled();
+    expect(savedState.has('track2stem_current_job')).toBe(true);
+  });
+
+  test('imports a YouTube video without requiring a local file', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('radio', { name: 'YouTube link' }));
+    fireEvent.change(screen.getByLabelText('YouTube video URL'), { target: { value: 'https://youtu.be/abcdefghijk' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Import & Process' })));
+    expect(axios.post).toHaveBeenCalledWith('/api/import', expect.objectContaining({
+      url: 'https://youtu.be/abcdefghijk',
+      settings: expect.objectContaining({ model: 'htdemucs_6s', output_format: 'mp3' }),
+    }));
+  });
+
+  test('remixes original backing instruments above unity and exposes practice exports', async () => {
+    const job = makeJob({
+      status: 'completed', stem_mode: 'isolate', isolate_stem: 'vocals',
+      output_files: { vocals: '/synthetic/vocals.wav', instrumental: '/synthetic/instrumental.wav' },
+      mix_stems: ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'],
+      artifacts: { drums_midi: '/synthetic/drums.mid', guitar_score: '/synthetic/guitar.musicxml' },
+      analysis: { bpm: 120, key: { name: 'D minor', confidence: .7 }, sections: [] },
+    });
+    savedState.set('track2stem_current_job', JSON.stringify(job));
+    axios.post.mockResolvedValue({ data: { ...job, gains: { bass: 1.75 } } });
+    await renderApp();
+    const bass = screen.getByLabelText('Bass volume');
+    expect(bass).toHaveValue('100');
+    fireEvent.change(bass, { target: { value: '175' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Export mix' })));
+    expect(axios.post).toHaveBeenCalledWith('/api/jobs/synthetic-job/mix', {
+      gains: expect.objectContaining({ bass: 1.75, vocals: 1, drums: 1 }),
+    });
+    expect(screen.getByRole('link', { name: 'Drum MIDI' })).toHaveAttribute('href', '/api/artifacts/synthetic-job/drums_midi');
+    expect(screen.getByRole('link', { name: 'Guitar score (MusicXML)' })).toBeInTheDocument();
+    expect(screen.getByText('D minor')).toBeInTheDocument();
   });
 });

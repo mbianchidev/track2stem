@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import './App.css';
 import Spectrogram from './Spectrogram.jsx';
+import StemMixer from './StemMixer.jsx';
+import PracticeResults from './PracticeResults.jsx';
+import { jobMetadata } from './job-metadata.js';
 
 const STORAGE_KEYS = {
   JOBS: 'track2stem_jobs',
@@ -9,6 +12,7 @@ const STORAGE_KEYS = {
   START_TIME: 'track2stem_start_time',
   PROCESSING_PROGRESS: 'track2stem_progress',
   INPUT_FILE_NAME: 'track2stem_input_filename',
+  SETTINGS: 'track2stem_settings',
 };
 
 const SIX_STEM_MODELS = ['htdemucs_6s'];
@@ -38,25 +42,62 @@ function Icon({ name, className = '' }) {
 }
 
 function BrandMark() {
-  return (
-    <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
-      <path d="M7 13v6m6-12v18m6-15v12m6-8v4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
+  return <img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" aria-hidden="true" />;
 }
 
-const stemLabel = (stem) => stem.charAt(0).toUpperCase() + stem.slice(1);
+const stemLabel = (stem) => (stem.charAt(0).toUpperCase() + stem.slice(1)).replaceAll('_', ' ');
+const PRACTICE_TOOLS = [
+  ['analysis', 'Tempo, key & song sections'], ['click_track', 'Click track'], ['lyrics', 'Lyrics'],
+  ['guitar_tabs', 'Guitar tabs'], ['bass_tabs', 'Bass tabs'], ['drum_tabs', 'Drum tabs & MIDI'],
+  ['split_vocals', 'Lead / backing vocals'],
+];
 
 function App() {
+  const actualStorage = window.track2stemHost?.storage || window.localStorage;
+  const [storageError, setStorageError] = useState('');
+  const localStorage = useMemo(() => ({
+    getItem: actualStorage.getItem.bind(actualStorage),
+    setItem(key, value) {
+      try {
+        actualStorage.setItem(key, value);
+      } catch (failure) {
+        console.error('Could not persist workspace metadata:', failure);
+        setStorageError('Workspace metadata could not be saved. Export important audio and remove older history before saving more jobs.');
+      }
+    },
+    removeItem(key) {
+      try {
+        actualStorage.removeItem(key);
+      } catch (failure) {
+        console.error('Could not remove workspace metadata:', failure);
+        setStorageError('Workspace metadata could not be saved. Export important audio and check storage permissions.');
+      }
+    },
+  }), [actualStorage]);
+  const nativeHost = Boolean(window.track2stemHost);
+  const [restored] = useState(() => {
+    try {
+      const raw = nativeHost ? localStorage.getItem(STORAGE_KEYS.SETTINGS) : null;
+      const settings = raw ? JSON.parse(raw) : {};
+      if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error('Invalid saved settings');
+      return { settings };
+    } catch (failure) {
+      console.error('Could not restore DAW settings:', failure);
+      return { settings: {}, error: 'Saved DAW settings could not be restored. Choose the separation settings again.' };
+    }
+  });
   const [file, setFile] = useState(null);
+  const [sourceType, setSourceType] = useState('file');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentJob, setCurrentJob] = useState(null);
   const [processingProgress, setProcessingProgress] = useState({ progress: 0, stage: '' });
   const [jobs, setJobs] = useState([]);
-  const [error, setError] = useState('');
-  const [stemMode, setStemMode] = useState('all'); // 'all' or 'isolate'
-  const [isolateStem, setIsolateStem] = useState('vocals'); // which stem to isolate
+  const [error, setError] = useState(restored.error || '');
+  const [nativeNotice, setNativeNotice] = useState('');
+  const [stemMode, setStemMode] = useState(restored.settings.stemMode || 'all');
+  const [isolateStem, setIsolateStem] = useState(restored.settings.isolateStem || 'vocals');
   const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
   const [isInitialized, setIsInitialized] = useState(false); // Track if localStorage has been loaded
   const [showAdvanced, setShowAdvanced] = useState(false); // Toggle advanced options
@@ -67,28 +108,58 @@ function App() {
   const [modelNotice, setModelNotice] = useState('');
 
   // Advanced options
-  const [outputFormat, setOutputFormat] = useState('mp3');
-  const [model, setModel] = useState('htdemucs_6s');
-  const [segment, setSegment] = useState('');
-  const [overlap, setOverlap] = useState('0.25');
-  const [shifts, setShifts] = useState('0');
-  const [clipMode, setClipMode] = useState('rescale');
+  const [outputFormat, setOutputFormat] = useState(restored.settings.outputFormat || 'mp3');
+  const [model, setModel] = useState(restored.settings.model || 'htdemucs_6s');
+  const [segment, setSegment] = useState(restored.settings.segment || '');
+  const [overlap, setOverlap] = useState(restored.settings.overlap ?? '0.25');
+  const [shifts, setShifts] = useState(restored.settings.shifts || '0');
+  const [clipMode, setClipMode] = useState(restored.settings.clipMode || 'rescale');
+  const [workers, setWorkers] = useState(restored.settings.workers || '1');
+  const [tools, setTools] = useState(Object.fromEntries(PRACTICE_TOOLS.map(([name]) => [name, restored.settings.tools?.[name] === true])));
 
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
   const historyHeadingRef = useRef(null);
+  const activeJobRef = useRef(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+  const API_BASE = window.track2stemHost?.apiBase || import.meta.env.VITE_API_URL || '/api';
 
   const isSixStemModel = SIX_STEM_MODELS.includes(model);
   const availableStems = isSixStemModel ? SIX_STEMS : FOUR_STEMS;
+  const separatedStems = tools.split_vocals ? ['lead_vocals', 'backing_vocals', ...availableStems.slice(1)] : availableStems;
   const expectedStems = stemMode === 'all'
-    ? availableStems
-    : [isolateStem, isolateStem === 'vocals' ? 'instrumental' : 'backing'];
+    ? separatedStems
+    : [...(tools.split_vocals && isolateStem === 'vocals' ? ['lead_vocals', 'backing_vocals'] : [isolateStem]),
+      isolateStem === 'vocals' ? 'instrumental' : 'backing'];
   const currentProgress = Number.isFinite(processingProgress.progress)
     ? Math.max(0, Math.min(100, processingProgress.progress))
     : null;
+  const cpuProfile = segment === '7' && shifts === '0' && model === 'hdemucs_mmi' && overlap === '0.1' ? 'fast'
+    : !segment && shifts === '0' && model === 'htdemucs_6s' && overlap === '0.25' ? 'six' : 'custom';
+
+  useEffect(() => {
+    activeJobRef.current = currentJob?.id ?? null;
+    return () => { activeJobRef.current = null; };
+  }, [currentJob?.id]);
+
+  useEffect(() => {
+    if (nativeHost) {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
+        stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode, workers, tools,
+      }));
+    }
+  }, [nativeHost, localStorage, stemMode, isolateStem, outputFormat, model, segment, overlap, shifts, clipMode, workers, tools]);
+
+  useEffect(() => {
+    const receive = (event) => {
+      if (event.detail.type === 'native_error') setError(event.detail.message);
+      else setNativeNotice(event.detail.message);
+    };
+    window.addEventListener('track2stem-native-message', receive);
+    return () => window.removeEventListener('track2stem-native-message', receive);
+  }, []);
 
   // Format elapsed time as Xm Ys
   const formatElapsedTime = (seconds) => {
@@ -143,14 +214,14 @@ function App() {
   // Save jobs to localStorage whenever they change
   useEffect(() => {
     if (jobs.length > 0) {
-      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobs));
+      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobs.map(jobMetadata)));
     }
   }, [jobs]);
 
   // Save current job to localStorage whenever it changes
   useEffect(() => {
     if (currentJob) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_JOB, JSON.stringify(currentJob));
+      localStorage.setItem(STORAGE_KEYS.CURRENT_JOB, JSON.stringify(jobMetadata(currentJob)));
     }
   }, [currentJob]);
 
@@ -239,6 +310,7 @@ function App() {
   const fetchJobStatus = useCallback(async (jobId) => {
     try {
       const response = await axios.get(`${API_BASE}/jobs/${jobId}`);
+      if (activeJobRef.current !== jobId) return;
       const updatedJob = response.data;
       setCurrentJob(updatedJob);
       setStatusWarning('');
@@ -253,14 +325,23 @@ function App() {
         setProcessingProgress({ progress: 100, stage: 'Done!' });
       }
     } catch (err) {
+      if (activeJobRef.current !== jobId) return;
       console.error('Failed to fetch job status:', err);
-      setStatusWarning('Could not refresh this job. Retrying automatically; check the server connection.');
+      if (err.response?.status === 404) {
+        setCurrentJob((previous) => previous?.id === jobId ? {
+          ...previous, status: 'failed',
+          error: 'This job is no longer available. The server or local worker may have restarted. Import the source again.',
+        } : previous);
+      } else {
+        setStatusWarning('Could not refresh this job. Retrying automatically; check the server connection.');
+      }
     }
   }, [API_BASE]);
 
   const fetchProcessingProgress = useCallback(async (jobId) => {
     try {
       const response = await axios.get(`${API_BASE}/processing-status/${jobId}`);
+      if (activeJobRef.current !== jobId) return;
       if (response.data) {
         setProcessingProgress(response.data);
         setProgressWarning('');
@@ -268,6 +349,7 @@ function App() {
         localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify(response.data));
       }
     } catch (err) {
+      if (activeJobRef.current !== jobId) return;
       console.warn('Failed to fetch processing progress:', err);
       setProgressWarning('Live progress is unavailable. Job status will continue to update.');
     }
@@ -318,17 +400,21 @@ function App() {
       setIsolateStem('vocals');
       setModelNotice('Isolation changed to vocals. Guitar and piano require the six-stem model.');
     }
+    if (!SIX_STEM_MODELS.includes(nextModel) && tools.guitar_tabs) {
+      setTools((previous) => ({ ...previous, guitar_tabs: false }));
+      setModelNotice('Guitar tabs disabled. Guitar transcription requires the six-stem model.');
+    }
   };
 
   const handleUpload = async (event) => {
     event.preventDefault();
-    if (!file) {
-      setError('Please select a file');
+    if (sourceType === 'file' ? !file : !youtubeUrl.trim()) {
+      setError(sourceType === 'file' ? 'Please select a file' : 'Please enter a YouTube video URL');
       return;
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    if (sourceType === 'file') formData.append('file', file);
     formData.append('stem_mode', stemMode);
     formData.append('isolate_stem', isolateStem);
     formData.append('output_format', outputFormat);
@@ -341,6 +427,10 @@ function App() {
     if (overlap) {
       formData.append('overlap', overlap);
     }
+    formData.append('workers', workers);
+    for (const [name, enabled] of Object.entries(tools)) {
+      if (enabled) formData.append(name, 'true');
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -349,7 +439,7 @@ function App() {
     setProgressWarning('');
     
     // Save input file name to localStorage
-    localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, file.name);
+    localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, sourceType === 'file' ? file.name : 'YouTube audio');
     
     // Reset timer for new job
     startTimeRef.current = Date.now();
@@ -361,7 +451,12 @@ function App() {
     localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify({ progress: 0, stage: 'Starting...' }));
 
     try {
-      const response = await axios.post(`${API_BASE}/upload`, formData, {
+      const response = sourceType === 'youtube'
+        ? await axios.post(`${API_BASE}/import`, {
+          url: youtubeUrl.trim(),
+          settings: Object.fromEntries([...formData.entries()].filter(([name]) => name !== 'file')),
+        })
+        : await axios.post(`${API_BASE}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -371,9 +466,10 @@ function App() {
             : null;
           setUploadProgress(percentCompleted);
         },
-      });
+        });
       
       setCurrentJob(response.data);
+      activeJobRef.current = response.data.id;
       setFile(null);
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -390,17 +486,19 @@ function App() {
         message = typeof data === 'string' ? data : data?.error || err.message || 'The request could not be completed.';
       }
 
-      setError('Upload failed: ' + message);
+      setError((sourceType === 'youtube' ? 'Import failed: ' : 'Upload failed: ') + message);
     } finally {
       setUploading(false);
     }
   };
 
   const handleDownload = (jobId, stem) => {
-    window.open(getDownloadUrl(jobId, stem), '_blank');
+    const url = getDownloadUrl(jobId, stem);
+    if (nativeHost) window.track2stemHost.download(url);
+    else window.open(url, '_blank');
   };
 
-  const handleDeleteJob = async (jobId) => {
+  const handleDeleteJob = async (jobId, requireCancellation = false) => {
     // Find the job to check if it's in progress
     const jobToDelete = jobs.find(j => j.id === jobId) || (currentJob?.id === jobId ? currentJob : null);
     
@@ -410,6 +508,10 @@ function App() {
         await axios.delete(`${API_BASE}/jobs/${jobId}`);
       } catch (err) {
         console.warn('Could not cancel job on server:', err);
+        if (requireCancellation) {
+          setError('Could not cancel this job. Check the local processor connection and retry.');
+          return;
+        }
       }
     }
     
@@ -421,11 +523,12 @@ function App() {
     if (savedJobs) {
       const parsed = JSON.parse(savedJobs);
       const filtered = parsed.filter(j => j.id !== jobId);
-      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(filtered));
+      localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(filtered.map(jobMetadata)));
     }
     
     // If it's the current job, clear it and all related state
     if (currentJob && currentJob.id === jobId) {
+      activeJobRef.current = null;
       setCurrentJob(null);
       setProcessingProgress({ progress: 0, stage: '' });
       localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
@@ -439,6 +542,7 @@ function App() {
   };
 
   const handleClearCurrentJob = () => {
+    activeJobRef.current = null;
     setCurrentJob(null);
     setProcessingProgress({ progress: 0, stage: '' });
     localStorage.removeItem(STORAGE_KEYS.CURRENT_JOB);
@@ -453,11 +557,17 @@ function App() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString() : 'Unknown (restored job)';
   };
 
   const getDownloadUrl = (jobId, stem) => {
     return `${API_BASE}/download/${jobId}/${stem}`;
+  };
+
+  const updateMixedJob = (job) => {
+    setCurrentJob(job);
+    setJobs((previous) => [...previous.filter((entry) => entry.id !== job.id), job]);
   };
 
   return (
@@ -470,7 +580,7 @@ function App() {
             <span>Track2stem</span>
           </a>
           <div className="header-links">
-            <span className="host-label">Self-hosted audio separation</span>
+            <span className="host-label">{nativeHost ? 'Local DAW workspace' : 'Self-hosted audio separation'}</span>
             <a href="https://github.com/mbianchidev/track2stem/blob/main/docs/usage.md" target="_blank" rel="noreferrer">
               Usage guide <Icon name="arrow" />
             </a>
@@ -493,7 +603,20 @@ function App() {
               <h2 id="source-heading"><Icon name="file" /> Source audio</h2>
               <span className="panel-label">Input</span>
             </div>
-            <div className={`source-picker ${file ? 'has-file' : ''}`}>
+            <fieldset className="source-type" disabled={uploading}>
+              <legend className="sr-only">Source type</legend>
+              <label><input type="radio" name="sourceType" checked={sourceType === 'file'} onChange={() => { setSourceType('file'); setError(''); }} /> Audio file</label>
+              <label><input type="radio" name="sourceType" checked={sourceType === 'youtube'} onChange={() => { setSourceType('youtube'); setError(''); }} /> YouTube link</label>
+            </fieldset>
+            {sourceType === 'youtube' ? (
+              <div className="youtube-source">
+                <label className="setting-label" htmlFor="youtube-url">YouTube video URL</label>
+                <input id="youtube-url" form="separation-form" type="url" required value={youtubeUrl}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  onChange={(event) => setYoutubeUrl(event.target.value)} disabled={uploading} />
+                <p className="setting-help">Single videos up to 60 minutes and 100 MiB. Import only audio you have permission to use. Restricted videos may require a local file instead.</p>
+              </div>
+            ) : <><div className={`source-picker ${file ? 'has-file' : ''}`}>
               <input
                 ref={fileInputRef}
                 id="file-input"
@@ -525,7 +648,7 @@ function App() {
               <div className="source-waveform">
                 <Spectrogram audioFile={file} title="Source waveform" height={88} />
               </div>
-            )}
+            )}</>}
             {uploading && (
               <div className="upload-progress">
                 <div className="progress-caption">
@@ -536,9 +659,11 @@ function App() {
               </div>
             )}
             {error && <p className="error source-error" role="alert" id="source-error">{error}</p>}
+            {storageError && <p className="error source-error" role="alert">{storageError}</p>}
+            {nativeNotice && <p className="native-notice" role="status">{nativeNotice}</p>}
           </section>
 
-          <form className="panel settings-panel" aria-labelledby="settings-heading" onSubmit={handleUpload} aria-busy={uploading}>
+          <form id="separation-form" className="panel settings-panel" aria-labelledby="settings-heading" onSubmit={handleUpload} aria-busy={uploading}>
             <div className="panel-header">
               <h2 id="settings-heading"><Icon name="settings" /> Separation settings</h2>
             </div>
@@ -554,8 +679,8 @@ function App() {
                     onChange={(e) => setStemMode(e.target.value)}
                   />
                   <span className="mode-copy">
-                    <span className="mode-label">All {availableStems.length} stems</span>
-                    <span className="mode-desc">{availableStems.map(stemLabel).join(', ')}</span>
+                    <span className="mode-label">All {separatedStems.length} stems</span>
+                    <span className="mode-desc">{separatedStems.map(stemLabel).join(', ')}</span>
                   </span>
                 </label>
                 <label className={`mode-option ${stemMode === 'isolate' ? 'selected' : ''}`}>
@@ -602,6 +727,28 @@ function App() {
                   ? <p className="setting-help model-notice" role="status">{modelNotice}</p>
                   : <p className="setting-help">{isSixStemModel ? 'Includes separate guitar and piano tracks.' : 'Vocals, drums, bass, and other instruments.'}</p>}
               </div>
+              <div className="setting-group">
+                <label className="setting-label" htmlFor="profile-select">CPU profile</label>
+                <select id="profile-select" value={cpuProfile} disabled={uploading} onChange={(event) => {
+                  if (event.target.value === 'fast') {
+                    handleModelChange({ target: { value: 'hdemucs_mmi' } });
+                    setOverlap('0.1');
+                    setShifts('0');
+                    setSegment('7');
+                    setModelNotice('Fast profile: Hybrid v3, four instruments, bounded 7-second windows, no shift passes, and less overlap. Quality differs from the six-stem model.');
+                  } else if (event.target.value === 'six') {
+                    setModel('htdemucs_6s');
+                    setOverlap('0.25');
+                    setShifts('0');
+                    setSegment('');
+                    setModelNotice('');
+                  }
+                }}>
+                  <option value="custom" disabled>Custom settings</option>
+                  <option value="six">Six-stem defaults</option>
+                  <option value="fast">Fast / four stems</option>
+                </select>
+              </div>
 
               <fieldset className="settings-fieldset" disabled={uploading}>
                 <legend className="setting-label">Output format</legend>
@@ -618,6 +765,17 @@ function App() {
                   {outputFormat === 'mp3' ? '320 kbps' : outputFormat === 'wav' ? 'Uncompressed audio' : 'Lossless compression'}
                 </p>
               </fieldset>
+              <fieldset className="settings-fieldset practice-options" disabled={uploading}>
+                <legend className="setting-label">Practice tools</legend>
+                {PRACTICE_TOOLS.map(([name, text]) => (
+                  <label key={name}>
+                    <input type="checkbox" checked={tools[name]} disabled={uploading || (name === 'guitar_tabs' && !isSixStemModel)}
+                      onChange={(event) => setTools((previous) => ({ ...previous, [name]: event.target.checked }))} />
+                    {text}
+                  </label>
+                ))}
+                <p className="setting-help">Optional local processing. Lyrics, tabs and vocal splitting download extra models on first use. Automatic transcriptions need review.</p>
+              </fieldset>
 
               <div className="advanced-section">
                 <button type="button" className="advanced-toggle" aria-expanded={showAdvanced}
@@ -629,10 +787,20 @@ function App() {
                   {showAdvanced && (
                     <div className="advanced-options-panel">
                       <div className="setting-group">
+                        <label className="setting-label" htmlFor="workers-select">Parallel CPU workers</label>
+                        <select id="workers-select" value={workers} onChange={(event) => setWorkers(event.target.value)} disabled={uploading}>
+                          {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}{count === 1 ? ' / low memory' : ' / more memory'}</option>)}
+                        </select>
+                        <p className="setting-help">Workers share one model and crossfade overlapping segments. Start with one on memory-limited hosts.</p>
+                      </div>
+                      <div className="setting-group">
                         <label className="setting-label" htmlFor="segment-select">Segment size</label>
                         <select id="segment-select" value={segment} onChange={(e) => setSegment(e.target.value)} disabled={uploading}>
                           <option value="">Default</option>
-                          <option value="8">8 s (low memory)</option>
+                          <option value="5">5 s (low memory)</option>
+                          <option value="7">7 s</option>
+                          {!model.startsWith('htdemucs') && <option value="8">8 s</option>}
+                          {!model.startsWith('htdemucs') && <>
                           <option value="10">10 s</option>
                           <option value="15">15 s</option>
                           <option value="20">20 s</option>
@@ -640,6 +808,7 @@ function App() {
                           <option value="30">30 s</option>
                           <option value="40">40 s</option>
                           <option value="60">60 s (high memory)</option>
+                          </>}
                         </select>
                       </div>
 
@@ -683,11 +852,11 @@ function App() {
               </div>
 
               <div className="settings-action">
-                <button type="submit" disabled={!file || uploading} className="upload-button">
-                  {uploading ? `Uploading...${uploadProgress === null ? '' : ` ${uploadProgress}%`}` : 'Upload & Process'}
+                <button type="submit" disabled={(sourceType === 'file' ? !file : !youtubeUrl.trim()) || uploading} className="upload-button">
+                  {uploading ? `Uploading...${uploadProgress === null ? '' : ` ${uploadProgress}%`}` : sourceType === 'youtube' ? 'Import & Process' : 'Upload & Process'}
                   <Icon name="arrow" />
                 </button>
-                <p className="setting-footnote">Processing runs on your server's CPU.</p>
+                <p className="setting-footnote">{nativeHost ? 'Processing stays on this Mac.' : "Processing runs on your server's CPU."}</p>
               </div>
             </div>
           </form>
@@ -739,6 +908,14 @@ function App() {
                       <span>CPU separation</span>
                     </div>
                     <p className="processing-note">Processing time depends on track length, model, and quality settings.</p>
+                    <button type="button" className="quiet-button" disabled={cancelling} onClick={async () => {
+                      setCancelling(true);
+                      try {
+                        await handleDeleteJob(currentJob.id, true);
+                      } finally {
+                        setCancelling(false);
+                      }
+                    }}>{cancelling ? 'Cancelling...' : 'Cancel job'}</button>
                     {statusWarning && <p className="inline-notice" role="status">{statusWarning}</p>}
                     {progressWarning && <p className="inline-notice" role="status">{progressWarning}</p>}
                   </div>
@@ -751,12 +928,13 @@ function App() {
                         <span>Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</span>
                       )}
                     </p>
+                    {currentJob.mix_stems?.length > 0 && <StemMixer key={currentJob.id} job={currentJob} apiBase={API_BASE} onJobChange={updateMixedJob} />}
                     <div className="stem-lanes">
                       {Object.keys(currentJob.output_files).map((stem) => (
                         <div className="stem-lane" key={stem}>
                           <h3 className="stem-name">{stemLabel(stem)}</h3>
                           <div className="stem-waveform">
-                            <Spectrogram audioUrl={getDownloadUrl(currentJob.id, stem)} label={`${stemLabel(stem)} waveform`} height={52} />
+                            <Spectrogram audioUrl={`${getDownloadUrl(currentJob.id, stem)}?v=${encodeURIComponent(currentJob.output_files[stem])}`} label={`${stemLabel(stem)} waveform`} height={52} />
                           </div>
                           <button type="button" className="download-button" aria-label={`Download ${stem}`} onClick={() => handleDownload(currentJob.id, stem)}>
                             <Icon name="download" /> Download
@@ -764,6 +942,7 @@ function App() {
                         </div>
                       ))}
                     </div>
+                    <PracticeResults job={currentJob} apiBase={API_BASE} />
                   </>
                 )}
                 {currentJob.status === 'failed' && <p className="error" role="alert">Separation failed: {currentJob.error}</p>}

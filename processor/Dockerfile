@@ -1,6 +1,8 @@
+FROM node:26.12.1-slim AS javascript
 FROM python:3.14.9-slim
 
 WORKDIR /app
+COPY --from=javascript /usr/local/bin/node /usr/local/bin/node
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

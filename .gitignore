@@ -47,3 +47,8 @@ __pycache__/
 *.so
 .Python
 .pytest_cache/
+plugin/build/
+plugin/dist/
+frontend/test-results/
+frontend/playwright-report/
+.venv/

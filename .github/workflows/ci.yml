@@ -97,10 +97,15 @@ jobs:
           python-version: '3.14.9'
 
       - name: Install test dependencies
-        run: pip install flask werkzeug pytest
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg libsndfile1
+          pip install -r requirements-test.txt
 
       - name: Run tests
-        run: python -m pytest test_app.py -v
+        run: |
+          python -m pytest -q -W error::RuntimeWarning
+          python -m unittest discover -s ../plugin/tests -p 'test_*.py'
 
   docker:
     name: Docker Compose Validation & Build
@@ -141,6 +146,26 @@ jobs:
 
       - name: Verify container health
         run: docker compose ps
+
+      - name: Setup Node.js for browser integration
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.12.1'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install browser integration dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Exercise real separation through Nginx
+        working-directory: frontend
+        run: npm run test:e2e
+        env:
+          TRACK2STEM_TEST_URL: http://127.0.0.1:3000
 
       - name: Show logs on failure
         if: failure()
