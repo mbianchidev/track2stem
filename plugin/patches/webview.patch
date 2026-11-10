@@ -53,3 +53,15 @@ diff --git a/IPlug/Extras/WebView/IPlugWKWebViewDelegate.mm b/IPlug/Extras/WebVi
  {
    mIWebView->OnFailedToDownloadFile([[downloadDestinationURL absoluteString] UTF8String]);
    downloadDestinationURL = nil;
+diff --git a/IPlug/Extras/WebView/IPlugWebView_mac.mm b/IPlug/Extras/WebView/IPlugWebView_mac.mm
+--- a/IPlug/Extras/WebView/IPlugWebView_mac.mm
++++ b/IPlug/Extras/WebView/IPlugWebView_mac.mm
+@@ -353,7 +353,7 @@
+ 
+ void IWebViewImpl::EvaluateJavaScript(const char* scriptStr, IWebView::completionHandlerFunc func)
+ {
+-  if (mWKWebView && ![mWKWebView isLoading])
++  if (mWKWebView)
+   {
+     [mWKWebView evaluateJavaScript:[NSString stringWithUTF8String:scriptStr] completionHandler:^(NSString *result, NSError *error) {
+       if (error != nil)

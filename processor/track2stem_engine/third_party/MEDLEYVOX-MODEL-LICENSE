@@ -1,0 +1,22 @@
+MedleyVox multi_singing_librispeech inference weights
+
+Published model card:
+https://huggingface.co/Cyru5/MedleyVox/blob/5c9e4e0d909e5a006c992b3422901ed416f4e57f/README.md
+
+The model publisher identifies the developer as Carson Evans and
+explicitly declares the model license as Creative Commons Attribution 4.0:
+https://creativecommons.org/licenses/by/4.0/
+
+File: multi_singing_librispeech/vocals.pth
+Model repository revision: 5c9e4e0d909e5a006c992b3422901ed416f4e57f
+SHA-256: 5c8ff43108ee58ffc9555359fa05727534d4448d95d58b563332026487de43c8
+
+Track2stem uses the published EMA tensors with an inference implementation
+built from MIT-licensed Asteroid primitives. It does not redistribute the
+weights or copy code from the unlicensed research repository. The weights
+retain their original attribution/license, not Track2stem's MIT license.
+
+The model card links the MedleyVox research and evaluation dataset:
+https://arxiv.org/abs/2211.07302
+Training data and individual recordings retain their own licenses; the
+model's license is not a license to redistribute that source material.

@@ -21,7 +21,7 @@ jobs:
   macos:
     name: Apple Silicon VST3 and AU
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +54,7 @@ jobs:
       - name: Build native targets and workflow probe
         run: |
           cmake -S plugin -B plugin/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build plugin/build --target Track2stem-vst3 Track2stem-au track2stem-native-smoke --parallel 3
+          cmake --build plugin/build --target Track2stem-vst3 Track2stem-au track2stem-native-smoke track2stem-au-registration --parallel 3
           codesign --force --sign - plugin/build/out/Track2stem.vst3
           codesign --force --sign - plugin/build/out/Track2stem.component
 
@@ -75,6 +75,21 @@ jobs:
             "$RUNNER_TEMP/track2stem-models" \
             "$RUNNER_TEMP/native-ui-evidence" \
             "$RUNNER_TEMP/native-fixture.wav"
+
+      - name: Verify real Studio Duo VST3 and AU workflows
+        run: |
+          python plugin/tests/check-studio-duo.py \
+            --plugin "$PWD/plugin/build/out/Track2stem.vst3" \
+            --worker "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+            --models "$RUNNER_TEMP/track2stem-models" \
+            --fixture "$RUNNER_TEMP/native-fixture.wav" \
+            --output "$RUNNER_TEMP/studio-duo-vst3"
+          python plugin/tests/check-studio-duo.py \
+            --plugin "$PWD/plugin/build/out/Track2stem.component" \
+            --worker "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+            --models "$RUNNER_TEMP/track2stem-models" \
+            --fixture "$RUNNER_TEMP/native-fixture.wav" \
+            --output "$RUNNER_TEMP/studio-duo-au"
 
       - name: Package and verify isolated installation
         run: |

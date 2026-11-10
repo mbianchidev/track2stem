@@ -143,7 +143,8 @@ def main():
     ]
     for library in sorted((codecs / "lib").glob("*.dylib")):
         command.extend(["--add-binary", f"{library}:."])
-    for package in ("demucs", "dora", "torchaudio", "faster_whisper",
+    for package in ("demucs", "dora", "torchaudio", "faster_whisper", "beat_this",
+                    "safetensors", "asteroid_filterbanks", "sklearn",
                     "ctranslate2", "onnxruntime", "librosa", "yt_dlp", "yt_dlp_ejs", "av"):
         command.extend(["--collect-all", package])
     command.extend(["--copy-metadata", "torch", ROOT / "processor/worker_entry.py"])
@@ -157,12 +158,16 @@ def main():
         shutil.copy2(build / "downloads" / pins[name]["archive"], sources)
     shutil.copytree(ROOT / "processor/drum_transcriber", sources / "ADT_STR_CPU",
                     dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(ROOT / "processor/track2stem_engine/third_party", sources / "VocalInference",
+                    dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(PLUGIN / "native-dependencies.json", sources)
     shutil.copy2(PLUGIN / "build-runtime.py", sources)
     notices = build / "runtime-dist/Notices"
     notices.mkdir(exist_ok=True)
     shutil.copy2(node / "LICENSE", notices / "Node-LICENSE.txt")
     shutil.copy2(ROOT / "processor/drum_transcriber/LICENSE", notices / "ADT_STR-CPU-CC-BY-SA-4.0.txt")
+    for name in ("ASTEROID-LICENSE", "MEDLEYVOX-MODEL-LICENSE"):
+        shutil.copy2(ROOT / "processor/track2stem_engine/third_party" / name, notices / f"{name}.txt")
     for location in ("licenses", "share/licenses"):
         if (standalone / location).is_dir():
             shutil.copytree(standalone / location, notices / "Python-runtime", dirs_exist_ok=True)

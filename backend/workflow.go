@@ -34,6 +34,7 @@ type ProcessorResult struct {
 	Gains          map[string]float64 `json:"gains"`
 	Analysis       json.RawMessage    `json:"analysis"`
 	Lyrics         json.RawMessage    `json:"lyrics"`
+	VocalSplit     json.RawMessage    `json:"vocal_split"`
 	ProcessingTime string             `json:"processing_time"`
 }
 
@@ -133,6 +134,7 @@ func completeJob(jobID string, result ProcessorResult) {
 	job.Gains = result.Gains
 	job.Analysis = result.Analysis
 	job.Lyrics = result.Lyrics
+	job.VocalSplit = result.VocalSplit
 	job.ProcessingTime = result.ProcessingTime
 }
 

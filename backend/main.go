@@ -40,6 +40,7 @@ type Job struct {
 	Gains          map[string]float64 `json:"gains,omitempty"`
 	Analysis       json.RawMessage    `json:"analysis,omitempty"`
 	Lyrics         json.RawMessage    `json:"lyrics,omitempty"`
+	VocalSplit     json.RawMessage    `json:"vocal_split,omitempty"`
 	SourceURL      string             `json:"source_url,omitempty"`
 }
 

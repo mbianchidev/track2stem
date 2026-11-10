@@ -16,6 +16,12 @@ owning-process checks, and grammar-constrained decoding added. The
 decoder enforces monotonic window-local onsets and prevents duplicate
 same-instrument/same-onset loops rather than silently truncating them.
 Inadequate probability mass on valid tokens is an explicit error.
+Bounded beam search considers complete event sequences rather than
+only greedy token choices.
+Events require local acoustic attack support. Tonal tom registers may
+be refined from at least three well-separated pitch clusters within the
+recording, excluding simultaneous kick/tom ambiguity; no instrument samples
+or fixed SoundFont pitch labels are used.
 Bounded peak normalization and overlapping context improve quiet-hit
 recognition; velocities are compensated for the applied input gain.
 Release-only windows without a new transient are not amplified into

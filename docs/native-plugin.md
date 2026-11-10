@@ -42,16 +42,16 @@ Cancelling is cooperative between model windows and during conversion. Closing o
 
 | Target | Current evidence |
 |--------|------------------|
-| macOS 26.6, arm64, Studio Duo 1.7.6, VST3 | The isolated Studio Duo native probe loads the real bundle, processes synthetic audio, round-trips opaque state, and creates its editor. |
-| macOS 26.6, arm64, Studio Duo 1.7.6, AUv2 | The same probe passes using process-local AU registration, without changing the user's plugin catalog. |
+| macOS 26.6, arm64, Studio Duo 1.7.6, VST3, trusted-in-process/native editor | The real StudioAudioEngine runs software playback with the real insert, imports and separates generated audio, exports while playing and paused, saves/reopens a `.studioduo` project through PluginStateStore, and exercises failed input, missing audio, cancellation, worker crash/restart and teardown. |
+| macOS 26.6, arm64, Studio Duo 1.7.6, AUv2, trusted-in-process/native editor | The same complete host workflow uses process-local AU registration, without changing the user's plugin catalog. |
 | Packaged local worker | Real synthetic inference verifies six PCM16 WAV stems, FLAC lead/backing vocals plus instrumental, 320-kbps MP3 isolation/backing, practice artifacts and remixing. |
 | Package installation | The ZIP checksum, dependency sources/notices, signatures and installed CPU runtime are checked in an isolated temporary home with a minimal system-only PATH. Reinstallation is refused and synthetic existing data/model-cache markers are preserved. |
 | Offscreen native editor | The real AU editor launches its bundled worker, imports generated audio, exports through the native adapter, reports missing files and cancellation/write errors, cancels processing, saves/reopens project state, and survives an injected worker crash while rendering unchanged synthetic audio. Only the OS save-dialog selection is replaced by a test double; no user workspace or audio device is opened. |
 | Other DAWs, Intel macOS, Windows, Linux-native plugins, Apple App Sandbox | Not qualified or supported by this initial target. Web deployment remains separate. |
 
-These are automated checks, not a certification of every vendor mode, physical audio deadline, accessibility workflow, or long-running session. The Studio Duo reports deliberately retain `qualificationStatus: not-qualified`; a basic probe is not a full release sign-off. `BuildInfo.json` records the runtime's actual deployment targets and absence of machine-local library references. A macOS 14.0 deployment target is not evidence that older hosts have been qualified.
+These are automated checks, not certification of every vendor mode, physical audio deadline, accessibility workflow, or long-running session. Playback is rendered through the actual host engine without an audio device or user project. Sandboxed host modes are not qualified. `BuildInfo.json` records the runtime's actual deployment targets and absence of machine-local library references. A macOS 14.0 deployment target is not evidence that older hosts have been qualified.
 
-Studio Duo's generic extended-effect workflow requires a continuous automatable control and stops at that precondition for this offline utility, which exposes only host bypass. The native-specific import/export, cancellation, recovery and pass-through checks use the separate offscreen editor probe instead; the generic workflow is not reported as passing.
+Studio Duo's generic extended-effect probe retains `qualificationStatus: not-qualified`: it requires a continuous automatable control and stops at that precondition for this offline utility, which exposes only host bypass. It is not weakened or reported as passing. The dedicated workflow instead uses the pinned real host engine, editor and project/state implementation with an offscreen native-specific test entrypoint.
 
 ## Build independently of the web stack
 
@@ -63,7 +63,7 @@ bash plugin/build.sh
 
 The script provisions checksum-pinned standalone Python 3.14.9 into the build directory, installs declared dependencies in its isolated runtime environment, builds an LGPL-only FFmpeg/LAME stack, compiles PyAV against those libraries, freezes the Python worker, builds the shared React UI with local fonts, compiles the VST3/AU wrappers, and writes a timestamped ZIP plus SHA-256 file under `plugin/dist/`. It does not install plugins or publish a release.
 
-Builds fetch pinned iPlug2 and VST3 SDK revisions into the ignored build directory. Automatic SDK deployment into the user's Library is disabled. A small WebView patch prevents double navigation callbacks, treats a cancelled save dialog as cancellation, rejects HTTP export errors, and uses WebKit's actual failure-callback selector. A Mach-O audit rejects machine-local library references and records the deployment floor. Model weights are not bundled.
+Builds fetch pinned iPlug2 and VST3 SDK revisions into the ignored build directory. Automatic SDK deployment into the user's Library is disabled. A small WebView patch prevents double navigation callbacks and loading-state export-message loss, treats a cancelled save dialog as cancellation, rejects HTTP export errors, and uses WebKit's actual failure-callback selector. A Mach-O audit rejects machine-local library references and records the deployment floor. Model weights are not bundled.
 
 For focused wrapper development:
 
@@ -94,6 +94,20 @@ python3.14 plugin/tests/check-package.py plugin/dist/Track2stem-0.1.0-macos-arm6
 
 Replace `BUILD` with the generated artifact's timestamp. The check extracts into a temporary directory, runs the actual installer twice with an isolated home, and cleans up its own installation afterward.
 
+The supported-host check fetches the pinned Studio Duo source into the ignored build directory, builds its actual test engine, and runs without an audio device or visible window. Use a new evidence directory for each format:
+
+```bash
+python3.14 plugin/tests/check-worker.py --fixture-only "$PWD/plugin/build/native-fixture.wav"
+python3.14 plugin/tests/check-studio-duo.py \
+  --plugin "$PWD/plugin/build/out/Track2stem.vst3" \
+  --worker "$PWD/plugin/build/runtime-dist/track2stem-worker/track2stem-worker" \
+  --models "$HOME/Library/Caches/Track2stem/models" \
+  --fixture "$PWD/plugin/build/native-fixture.wav" \
+  --output "$PWD/plugin/build/studio-duo-vst3-evidence"
+```
+
+Repeat with `Track2stem.component` and a different `--output` to exercise AU. The helper uses a temporary HOME, a minimal environment, process-local AU registration and real `.studioduo` project packages. Only native file-dialog selection is replaced. Native CI runs both formats against the freshly frozen worker and reuses the host build; its timeout includes this independent host compilation.
+
 Native debugging can override `TRACK2STEM_WORKER`, `TRACK2STEM_DATA_DIR` and `TRACK2STEM_MODELS_DIR` before starting an isolated host. Worker logs are written under the selected data root. Do not point qualification tools at a user's live project or alter their global plugin catalog.
 
 ## Runtime and dependency licenses
@@ -104,4 +118,4 @@ Full-kit drum transcription calls the separately licensed ADT_STR CPU component 
 
 The distribution includes separate notices for Python dependencies, Node.js, CPython, and the fonts. FFmpeg is built with GPL and nonfree components disabled, using LGPL LAME and a source-built PyAV. Corresponding FFmpeg/LAME/PyAV source archives, checksums and build instructions accompany the package. The LGPL libraries remain replaceable; rebuilding modified binaries may require local ad-hoc signing.
 
-Model weights are fetched separately under upstream terms. In particular, the UVR karaoke download lacks a clear model-specific redistribution license. Do not redistribute those weights or claim that this repository's MIT license grants commercial model rights. See [model downloads](configuration.md#model-downloads).
+Neural vocal inference includes MIT Asteroid primitive source and the CC-BY-4.0 MedleyVox checkpoint attribution. The original unlicensed research implementation is not copied. Model weights remain first-use downloads, and the spatial vocal method requires none. Respect each model's upstream terms; this repository's MIT license does not grant blanket model rights. See [model downloads](configuration.md#model-downloads).

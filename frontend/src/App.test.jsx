@@ -192,6 +192,24 @@ describe('App', () => {
     expect(formData.get('isolate_stem')).toBe('drums');
   });
 
+  test('bounds fast-profile memory and restores the six-stem defaults', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: /Advanced tuning/i }));
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'fast' } });
+    expect(screen.getByLabelText('Segment size')).toHaveValue('7');
+    expect(screen.getByLabelText('CPU profile')).toHaveValue('fast');
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'six' } });
+    expect(screen.getByLabelText('Segment size')).toHaveValue('');
+    expect(screen.getByLabelText('AI model')).toHaveValue('htdemucs_6s');
+    fireEvent.change(screen.getByLabelText('CPU profile'), { target: { value: 'fast' } });
+    chooseFile();
+    const formData = await uploadFile();
+    expect(formData.get('model')).toBe('hdemucs_mmi');
+    expect(formData.get('segment')).toBe('7');
+    expect(formData.get('overlap')).toBe('0.1');
+    expect(formData.get('shifts')).toBe('0');
+  });
+
   test('disables editable controls during upload and exposes actual upload progress', async () => {
     let finishUpload;
     axios.post.mockImplementation(() => new Promise((resolve) => { finishUpload = resolve; }));

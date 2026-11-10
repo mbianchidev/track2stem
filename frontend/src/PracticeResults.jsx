@@ -3,6 +3,7 @@ import React from 'react';
 const ARTIFACT_NAMES = {
   analysis: 'Full analysis (JSON)', tempo: 'Tempo map (CSV)', meter: 'Meter map (CSV)', sections: 'Song sections (CSV)',
   click: 'Click track (WAV)', lyrics: 'Lyrics (text)', lyrics_srt: 'Lyrics (SRT)', lyrics_words: 'Word timings (JSON)',
+  vocal_split: 'Vocal separation details (JSON)',
   guitar_tabs: 'Guitar tabs', guitar_score: 'Guitar score (MusicXML)', guitar_midi: 'Guitar MIDI', guitar_notes: 'Guitar notes (JSON)',
   bass_tabs: 'Bass tabs', bass_score: 'Bass score (MusicXML)', bass_midi: 'Bass MIDI', bass_notes: 'Bass notes (JSON)',
   drums_tabs: 'Drum tabs', drums_score: 'Drum score (MusicXML)', drums_midi: 'Drum MIDI', drums_notes: 'Drum hits (JSON)',
@@ -56,6 +57,7 @@ export default function PracticeResults({ job, apiBase }) {
           <pre>{job.lyrics.text || 'No words detected.'}</pre>
         </details>
       )}
+      {job.vocal_split && <p className="setting-help">{job.vocal_split.warning} Weight license: {job.vocal_split.weight_license}.</p>}
       <div className="artifact-downloads">
         {artifacts.map((name) => (
           <a key={name} href={`${apiBase}/artifacts/${encodeURIComponent(job.id)}/${encodeURIComponent(name)}`} download>

@@ -64,10 +64,13 @@ class Engine:
             stems, sample_rate = self._separator(source, settings, report, cancelled)
             if set(stems) != set(settings.stems):
                 raise RuntimeError("Separation did not produce every requested instrument")
+            vocal_details = None
             if settings.split_vocals:
                 from .vocals import split_vocals
                 report(74, "Separating lead and backing vocals")
-                lead, backing = split_vocals(stems["vocals"], sample_rate, self.model_dir, report, cancelled)
+                vocal_details = {}
+                lead, backing = split_vocals(stems["vocals"], sample_rate, self.model_dir, report, cancelled,
+                                             details=vocal_details)
                 stems["lead_vocals"] = lead
                 stems["backing_vocals"] = backing
             for name, audio in stems.items():
@@ -81,8 +84,14 @@ class Engine:
                 "filename": source.name.removeprefix(f"{job_id}_"), "settings": settings.to_dict(),
                 "mix_stems": list(settings.mix_stems), "gains": dict.fromkeys(settings.mix_stems, 1.0),
                 "stem_files": {name: str(raw_dir / f"{name}.wav") for name in settings.mix_stems},
-                "artifacts": {}, "analysis": None,
+                "artifacts": {}, "analysis": None, "vocal_split": vocal_details,
             }
+            if vocal_details:
+                directory = job_dir / "artifacts"
+                directory.mkdir(exist_ok=True)
+                path = directory / "vocal-split.json"
+                path.write_text(json.dumps(vocal_details, allow_nan=False), encoding="utf-8")
+                manifest["artifacts"]["vocal_split"] = str(path)
             if settings.analysis or settings.click_track or settings.guitar_tabs or settings.bass_tabs or settings.drum_tabs:
                 from .analysis import analyze, make_click_track
                 report(76, "Detecting tempo changes, key, tuning and song sections")
@@ -100,7 +109,7 @@ class Engine:
                 manifest["artifacts"]["analysis"] = str(analysis_path)
                 for name, keys, values in (
                     ("tempo", ("time", "bpm"), analysis["tempo_changes"]),
-                    ("sections", ("start", "end", "label", "confidence"), analysis.get("sections", [])),
+                    ("sections", ("start", "end", "label", "group", "confidence"), analysis.get("sections", [])),
                     ("meter", ("time", "numerator", "denominator", "pulse_quarters", "confidence"),
                      analysis.get("meter_changes", [])),
                 ):
@@ -119,7 +128,8 @@ class Engine:
             if settings.lyrics:
                 from .lyrics import generate_lyrics
                 transcript, artifacts = generate_lyrics(
-                    stems["vocals"], sample_rate, job_dir / "artifacts", self.model_dir, report, cancelled,
+                    stems.get("lead_vocals", stems["vocals"]), sample_rate,
+                    job_dir / "artifacts", self.model_dir, report, cancelled,
                 )
                 manifest["lyrics"] = transcript
                 manifest["artifacts"].update(artifacts)

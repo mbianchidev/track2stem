@@ -25,7 +25,7 @@ Guitar and piano isolation require `htdemucs_6s`. Switching to a four-stem model
 
 Isolate mode still separates the full track before mixing the remaining stems. It is not a faster two-stem inference path. The API also accepts `other` as an isolated stem, though the browser's selector does not offer it.
 
-The **Fast / four stems** CPU profile selects the convolutional Hybrid v3 model `hdemucs_mmi`, disables shift passes, and reduces overlap to `0.1`. It sacrifices separate guitar/piano outputs and some boundary overlap; separation quality differs from the Transformer models. **Six-stem defaults** restores the default model and overlap. Neither profile is a processing-time guarantee.
+The **Fast / four stems** CPU profile selects the convolutional Hybrid v3 model `hdemucs_mmi`, bounds its windows to seven seconds, disables shift passes, and reduces overlap to `0.1`. Bounding the convolutional model's otherwise long default segment avoids its large memory cost. The profile sacrifices separate guitar/piano outputs and some boundary overlap; separation quality differs from the Transformer models. **Six-stem defaults** restores the default model, segment and overlap. Neither profile is a processing-time guarantee.
 
 ## Instrument levels
 
@@ -44,9 +44,11 @@ Enable only the tools needed before processing. Everything runs locally on CPU; 
 | Lyrics | Whisper large-v3-turbo CPU transcription of the vocal stem, with text, SRT subtitles and word-timing JSON. Sustained singing is not removed by speech-only VAD; unreliable no-speech segments are excluded. Singing and overlapping vocals can still reduce accuracy. |
 | Guitar tabs / Bass tabs | Basic Pitch CPU note estimates, proposed string/fret assignments, text tabs, MusicXML scores, MIDI and JSON. Guitar requires the six-stem model. Open MusicXML in a compatible Guitar Pro or notation editor and review rhythm, notes and tuning. |
 | Drum tabs & MIDI | An isolated ADT_STR CPU model estimates 26 percussion classes, including toms, ride, crashes and open/closed/pedal hats. Text, percussion MusicXML, General MIDI channel-10 events and JSON use the same detected hits. Class-level validation is ongoing; predictions are not a guaranteed acoustic-kit score. |
-| Lead / backing vocals | A second local karaoke model separates the vocal stem into `lead_vocals` and `backing_vocals`. In vocal-isolate mode, these appear beside `instrumental`. Separation is approximate and can contain bleed. |
+| Lead / backing vocals | Adaptive local separation produces `lead_vocals` and `backing_vocals`; vocal-isolate mode also includes `instrumental`. Identifiable stereo uses spatial unmixing without weights; mono or rank-deficient audio uses the explicitly licensed MedleyVox neural model. The dominant global stream is proposed as lead, not guaranteed to be the artistic lead. Results can contain bleed. |
 
 Tab requests automatically obtain beat/meter timing, even if the full key/section analysis is not enabled. MIDI and MusicXML preserve detected time-signature changes; uncertain meter is written as unmetered notation. Tempo maps use quarter-note BPM, so six eighth-note pulses at 120 pulses/minute become 60 quarter-note BPM in 6/8. Review ambiguous metrical interpretations.
+
+Vocal details include the selected method, model provenance and ambiguity warnings. Spatial separation assumes at most two approximately independent groups with fixed, distinct stereo positions; changing pans, reverberation and more voices can violate that assumption. `TRACK2STEM_VOCAL_METHOD=neural` selects the neural alternative explicitly; forced `spatial` rejects mono/unidentifiable input rather than pretending to split it. Mono separation remains approximate and has not demonstrated a quality gain on the controlled synthetic singing reference.
 
 Tuning inference examines the entire guitar/bass stem in bounded windows rather than only its introduction. It ranks supported standard, drop and extended-range tunings using stable pitch duration, multiple open-string matches and playable fret ranges. A lowest note alone cannot establish tuning. Ambiguous cases retain alternatives and are marked as such; notation uses an explicitly proposed fingering. Unassignable pitches remain in MIDI/JSON and are marked in the text export.
 

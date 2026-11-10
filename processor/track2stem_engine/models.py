@@ -27,11 +27,6 @@ MODELS = {
         "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
         "basic-pitch.onnx",
     ),
-    "karaoke": ModelSpec(
-        "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR_MDXNET_KARA_2.onnx",
-        "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
-        "karaoke.onnx",
-    ),
     "beat-small": ModelSpec(
         "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/small0.ckpt",
         "6074be2c4d490c5f6101fcc374a1ec72ae93456e23bb6019783b849f5dc7d47b",
@@ -41,6 +36,11 @@ MODELS = {
         "https://huggingface.co/Pierfrancesco/adt-str/resolve/a33c5c6b191a4ca1e0f6dc22140947485eb36ce8/setting-tau-0.8/model.safetensors",
         "f94d1773d929166e0a3f63d305975aa6667512f8a71d7706872e1f8b23ca930b",
         "drum-str.safetensors", max_bytes=350 * 1024 * 1024,
+    ),
+    "vocal-duet": ModelSpec(
+        "https://huggingface.co/Cyru5/MedleyVox/resolve/5c9e4e0d909e5a006c992b3422901ed416f4e57f/multi_singing_librispeech/vocals.pth",
+        "5c8ff43108ee58ffc9555359fa05727534d4448d95d58b563332026487de43c8",
+        "medleyvox-vocals.pth", max_bytes=300 * 1024 * 1024,
     ),
 }
 

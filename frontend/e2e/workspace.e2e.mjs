@@ -83,10 +83,14 @@ async function downloaded(page, locator) {
   return { buffer: await fs.readFile(await download.path()), filename: await download.path() };
 }
 
-function probe(filename, codec, duration) {
+function mediaInfo(filename) {
   const result = spawnSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', filename], { encoding: 'utf8' });
   expect(result.status, result.stderr).toBe(0);
-  const info = JSON.parse(result.stdout);
+  return JSON.parse(result.stdout);
+}
+
+function probe(filename, codec, duration) {
+  const info = mediaInfo(filename);
   const audio = info.streams.find((stream) => stream.codec_type === 'audio');
   expect(audio.codec_name).toBe(codec);
   expect(Number(audio.sample_rate)).toBe(44100);
@@ -174,4 +178,41 @@ test('invalid remote sources do not enqueue work', async ({ page, request }) => 
   await expect(page.getByRole('alert')).toContainText('single YouTube video');
   const after = await (await request.get(`${api()}/jobs`)).json();
   expect(after.length).toBe(before.length);
+});
+
+test('authorized synthetic YouTube source completes a live browser import and export', async ({ page, request }, testInfo) => {
+  const url = process.env.TRACK2STEM_TEST_YOUTUBE_URL;
+  test.skip(!url, 'Live external import requires an explicitly selected authorized synthetic source');
+  await page.goto('/');
+  await page.getByRole('radio', { name: 'YouTube link', exact: true }).check();
+  await page.getByLabel('YouTube video URL').fill(url);
+  await page.getByLabel('CPU profile').selectOption('fast');
+  await page.getByRole('radio', { name: /Isolate one/ }).check();
+  const response = page.waitForResponse((response) =>
+    response.url() === `${api()}/import` && response.request().method() === 'POST', { timeout: 15000 });
+  await page.getByRole('button', { name: 'Import & Process', exact: true }).click();
+  const posted = await response;
+  expect(posted.ok(), await posted.text()).toBeTruthy();
+  const job = await posted.json();
+  let completed;
+  await expect.poll(async () => {
+    const response = await request.get(`${api()}/jobs/${job.id}`);
+    expect(response.ok()).toBeTruthy();
+    completed = await response.json();
+    if (completed.status === 'failed') throw new Error(completed.error);
+    return completed.status;
+  }, { timeout: 160000, intervals: [500, 1000, 2000] }).toBe('completed');
+  await expect(page.locator('.completed-summary')).toContainText('Separation complete');
+  expect(Object.keys(completed.output_files).sort()).toEqual(['instrumental', 'vocals']);
+  const result = await downloaded(page, page.getByRole('button', { name: 'Download instrumental', exact: true }));
+  const seconds = Number(process.env.TRACK2STEM_TEST_YOUTUBE_SECONDS);
+  expect(seconds).toBeGreaterThan(0);
+  const raw = await request.get(`${api()}/stems/${completed.id}/other`);
+  expect(raw.ok()).toBeTruthy();
+  const reference = testInfo.outputPath('decoded-source-clock.wav');
+  await fs.writeFile(reference, await raw.body());
+  const duration = Number(mediaInfo(reference).format.duration);
+  expect(Math.abs(duration - seconds)).toBeLessThan(1);
+  // YouTube metadata rounds seconds; export timing must follow the actual decoded sample clock.
+  probe(result.filename, 'mp3', duration);
 });

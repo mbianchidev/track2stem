@@ -85,23 +85,39 @@ class DrumModel(nn.Module):
         self.compute_spectrogram = Spectrogram()
         self.project_to_mel = nn.Linear(128, 768)
 
-    def sample(self, audio, check_owner, maximum_tokens=512):
+    def sample(self, audio, check_owner, maximum_tokens=512, beam_size=5):
         check_owner()
         with torch.inference_mode():
             memory = self.encoder(self.project_to_mel(self.compute_spectrogram(audio)))
-            generated = torch.full((1, 1), 2, dtype=torch.long)
+            beams = [{"tokens": [2], "score": 0., "finished": False}]
             for _ in range(maximum_tokens - 1):
                 check_owner()
-                logits = self.decoder(generated, memory)[:, -1, :]
-                valid = allowed_tokens(generated[0].tolist())
-                if logits.softmax(dim=-1)[:, valid].sum().item() < .05:
+                active = [beam for beam in beams if not beam["finished"]]
+                if not active:
+                    break
+                generated = torch.tensor([beam["tokens"] for beam in active], dtype=torch.long)
+                logits = self.decoder(generated, memory.expand(len(active), -1, -1))[:, -1, :]
+                if not torch.isfinite(logits).all():
+                    raise RuntimeError("Drum inference produced non-finite event scores")
+                probabilities = logits.log_softmax(dim=-1)
+                candidates = [beam for beam in beams if beam["finished"]]
+                for index, beam in enumerate(active):
+                    valid = allowed_tokens(beam["tokens"])
+                    if probabilities[index, valid].exp().sum().item() < .05:
+                        continue
+                    scores, positions = probabilities[index, valid].topk(min(beam_size, len(valid)))
+                    for score, position in zip(scores.tolist(), positions.tolist()):
+                        token = valid[position]
+                        candidates.append({"tokens": [*beam["tokens"], token],
+                                           "score": beam["score"] + score, "finished": token == 3})
+                if not candidates:
                     raise RuntimeError("Drum model cannot reliably decode this audio window; no fabricated events were returned")
-                constrained = torch.full_like(logits, -torch.inf)
-                constrained[:, valid] = logits[:, valid]
-                if not torch.isfinite(constrained.max()):
-                    raise RuntimeError("Drum inference produced no finite, valid next event token")
-                next_token = constrained.argmax(dim=-1, keepdim=True)
-                generated = torch.cat((generated, next_token), dim=1)
-                if next_token.item() == 3:
-                    return generated[0].tolist()
+                candidates.sort(key=lambda beam: beam["score"] / max(1, len(beam["tokens"]) - 1), reverse=True)
+                beams = candidates[:beam_size]
+            complete = [beam for beam in beams if beam["finished"]]
+            if complete:
+                best = max(complete, key=lambda beam: beam["score"] / max(1, len(beam["tokens"]) - 1))
+                if best["score"] / max(1, len(best["tokens"]) - 1) < -3:
+                    raise RuntimeError("Drum prediction confidence is insufficient for a reliable event sequence")
+                return best["tokens"]
         raise RuntimeError("Drum inference reached its token limit before completing an audio window")

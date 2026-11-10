@@ -136,7 +136,7 @@ function App() {
   const currentProgress = Number.isFinite(processingProgress.progress)
     ? Math.max(0, Math.min(100, processingProgress.progress))
     : null;
-  const cpuProfile = !segment && shifts === '0' && model === 'hdemucs_mmi' && overlap === '0.1' ? 'fast'
+  const cpuProfile = segment === '7' && shifts === '0' && model === 'hdemucs_mmi' && overlap === '0.1' ? 'fast'
     : !segment && shifts === '0' && model === 'htdemucs_6s' && overlap === '0.25' ? 'six' : 'custom';
 
   useEffect(() => {
@@ -734,8 +734,8 @@ function App() {
                     handleModelChange({ target: { value: 'hdemucs_mmi' } });
                     setOverlap('0.1');
                     setShifts('0');
-                    setSegment('');
-                    setModelNotice('Fast profile: Hybrid v3, four instruments, no shift passes, and less overlap. Quality differs from the six-stem model.');
+                    setSegment('7');
+                    setModelNotice('Fast profile: Hybrid v3, four instruments, bounded 7-second windows, no shift passes, and less overlap. Quality differs from the six-stem model.');
                   } else if (event.target.value === 'six') {
                     setModel('htdemucs_6s');
                     setOverlap('0.25');

@@ -13,6 +13,47 @@ from track2stem_engine.audio import run_command
 from track2stem_engine.drums import drum_notes
 
 
+@pytest.mark.parametrize("frequencies", [(95, 150, 170, 240), (140, 210, 225, 330)])
+def test_tom_registers_use_the_recordings_pitches_not_a_fixed_soundfont(frequencies):
+    from drum_transcriber import events
+
+    rate = 24000
+    time = np.arange(round(rate * .15)) / rate
+    measured = [events.tom_frequency(
+        (np.sin(2 * np.pi * frequency * time) + .2 * np.sin(2 * np.pi * frequency * 1.6 * time))
+        * np.exp(-15 * time), rate,
+    ) for frequency in frequencies]
+    assert measured == pytest.approx(frequencies, rel=.05)
+    notes = [{"start": index * .5, "end": index * .5 + .1, "pitch": 41 if index < 3 else 50,
+              "velocity": 100} for index in range(4)]
+    refined, details = events.refine_tom_registers(notes, measured)
+    assert [entry["pitch"] for entry in refined] == [41, 47, 47, 50]
+    assert [entry["start"] for entry in refined] == [entry["start"] for entry in notes]
+    assert details["changed"] == 2
+    assert events.refine_tom_registers(notes, [100, 100.2, 180, 180.5])[0] == notes
+
+
+def test_acoustic_onsets_retain_quiet_attacks_but_not_unsupported_release_hits():
+    from drum_transcriber import events
+
+    time = np.arange(24000) / 24000
+    audio = .2 * np.sin(2 * np.pi * 140 * time) * np.exp(-6 * time)
+    audio[12000:12240] += .005
+    attacks = attack_envelope(audio)
+    assert events.supported_onset(.53, attacks, .0005) == pytest.approx(.5, abs=.011)
+    assert events.supported_onset(.85, attacks, .0005) is None
+
+
+def test_tom_calibration_does_not_collapse_simultaneous_distinct_hits():
+    from drum_transcriber import events
+
+    notes = [{"start": index, "end": index + .1, "pitch": pitch, "velocity": 100}
+             for index, pitch in enumerate((41, 47, 47, 50))]
+    notes.extend([{"start": 4., "end": 4.1, "pitch": pitch, "velocity": 90} for pitch in (41, 50)])
+    refined, _ = events.refine_tom_registers(notes, [90, 140, 155, 230, 150, 150])
+    assert [entry["pitch"] for entry in refined[-2:]] == [41, 50]
+
+
 def test_full_kit_tokens_map_to_actual_general_midi_classes():
     tokens = [2]
     classes = [36, 38, 42, 44, 41, 45, 47, 46, 48]

@@ -14,6 +14,7 @@ public:
   void OnUIOpen() override;
   void OnUIClose() override;
   void OnWebViewReady() override {}
+  void OnWebContentLoaded() override { OnUIOpen(); }
   bool OnMessage(int tag, int control, int size, const void* data) override;
   void OnMessageFromWebView(const char* message) override;
   bool SerializeState(iplug::IByteChunk& chunk) const override;

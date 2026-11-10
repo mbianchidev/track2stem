@@ -18,8 +18,23 @@
 #include <vector>
 #include <unistd.h>
 
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+#include "audio/StudioAudioEngine.h"
+#include "plugin_host/PluginFormats.h"
+#include "plugin_host/PluginStateStore.h"
+#include "project_io/ProjectFile.h"
+int StudioDuoOriginalMain(int argc, char** argv);
+#endif
+
 static NSString* exportRoot;
 static int exportMode = 0;
+static __weak WKWebView* forcedLoadingView;
+static IMP originalLoading = nullptr;
+
+static BOOL ProbeLoading(id view, SEL selector) {
+  if (view == forcedLoadingView) return YES;
+  return reinterpret_cast<BOOL (*)(id, SEL)>(originalLoading)(view, selector);
+}
 
 @interface Track2stemProbeSavePanel : NSObject
 @property(copy) NSString* title;
@@ -38,6 +53,11 @@ static int exportMode = 0;
 @end
 
 namespace {
+struct LoadingExportScope {
+  explicit LoadingExportScope(WKWebView* web) { forcedLoadingView = web; }
+  ~LoadingExportScope() { forcedLoadingView = nil; }
+};
+
 void Require(bool condition, const char* message) {
   if (!condition) throw std::runtime_error(message);
 }
@@ -47,6 +67,9 @@ void Check(OSStatus status, const char* message) { Require(status == noErr, mess
 id ProbePanel(id, SEL) { return [[Track2stemProbeSavePanel alloc] init]; }
 
 void Pump() {
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+  juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+#endif
   [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
 }
 
@@ -84,6 +107,30 @@ WKWebView* FindWeb(NSView* parent) {
   for (NSView* child in parent.subviews) if (WKWebView* result = FindWeb(child)) return result;
   return nil;
 }
+
+void WaitForNativeUI(WKWebView* web, const std::function<void()>& render) {
+  const bool ready = Wait([&] {
+    render();
+    return [JavaScript(web, @"Boolean(typeof window.track2stemHost?.apiBase === 'string' && document.querySelector('h1')?.textContent.includes('Separate audio'))") boolValue];
+  }, 45);
+  if (!ready) {
+    std::fprintf(stderr, "Native UI URL: %s\n", web.URL.absoluteString.UTF8String);
+    std::fprintf(stderr, "Native UI body: %s\n", [[JavaScript(web, @"document.body.innerText") description] UTF8String]);
+  }
+  Require(ready, "The bundled worker and native UI bridge did not become ready");
+}
+
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+#include "StudioDuoAdapter.h"
+
+IMP originalWindowOrder = nullptr;
+void OffscreenWindowOrder(id window, SEL selector, NSWindowOrderingMode mode, NSInteger relative) {
+  if (mode == NSWindowOut)
+    reinterpret_cast<void (*)(id, SEL, NSWindowOrderingMode, NSInteger)>(originalWindowOrder)(window, selector, mode, relative);
+}
+#else
+using HostComponent = AudioComponent;
+using SavedState = NSDictionary*;
 
 struct Audio {
   float left[256], right[256];
@@ -142,7 +189,7 @@ struct Instance {
   }
 };
 
-WKWebView* Open(Instance& instance, AudioComponent component, Audio& audio, NSDictionary* saved = nil) {
+WKWebView* Open(Instance& instance, HostComponent component, Audio& audio, SavedState saved = nil) {
   Check(AudioComponentInstanceNew(component, &instance.unit), "Cannot instantiate the real Audio Unit");
   const AudioStreamBasicDescription format {48000, kAudioFormatLinearPCM,
     kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved,
@@ -173,17 +220,18 @@ WKWebView* Open(Instance& instance, AudioComponent component, Audio& audio, NSDi
   instance.window.contentView = view;
   WKWebView* web = FindWeb(view);
   Require(web != nil, "The shared WebView was not embedded");
-  const bool ready = Wait([&] {
-    audio.Render(instance.unit);
-    return [JavaScript(web, @"Boolean(typeof window.track2stemHost?.apiBase === 'string' && document.querySelector('h1')?.textContent.includes('Separate audio'))") boolValue];
-  }, 45);
-  if (!ready) {
-    std::fprintf(stderr, "Native UI URL: %s\n", web.URL.absoluteString.UTF8String);
-    std::fprintf(stderr, "Native UI body: %s\n", [[JavaScript(web, @"document.body.innerText") description] UTF8String]);
-  }
-  Require(ready, "The bundled worker and native UI bridge did not become ready");
+  WaitForNativeUI(web, [&] { audio.Render(instance.unit); });
   return web;
 }
+
+SavedState SaveState(Instance& instance) {
+  CFPropertyListRef state = nullptr;
+  UInt32 size = sizeof(state);
+  Check(AudioUnitGetProperty(instance.unit, kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0, &state, &size),
+        "Cannot save the actual DAW state");
+  return CFBridgingRelease(state);
+}
+#endif
 
 void SelectFile(WKWebView* web, NSData* audio, NSString* name, int repeats = 1) {
   NSString* base64 = [audio base64EncodedStringWithOptions:0];
@@ -212,6 +260,13 @@ pid_t OwnedWorker(const char* executable) {
 }
 
 int main(int argc, char** argv) {
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+  if (argc < 2 || std::strcmp(argv[1], "--track2stem-native-workflow") != 0)
+    return StudioDuoOriginalMain(argc, argv);
+  --argc;
+  ++argv;
+  juce::ScopedJuceInitialiser_GUI juceInitialiser;
+#endif
   if (argc != 6) {
     std::fprintf(stderr, "Usage: native-smoke component worker models new-data-directory synthetic-wav\n");
     return 2;
@@ -229,8 +284,17 @@ int main(int argc, char** argv) {
       [NSApplication sharedApplication];
       [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
       [NSApp finishLaunching];
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+      Method ordering = class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:));
+      originalWindowOrder = method_setImplementation(ordering, reinterpret_cast<IMP>(OffscreenWindowOrder));
+#endif
       Method panel = class_getClassMethod([NSSavePanel class], @selector(savePanel));
       method_setImplementation(panel, reinterpret_cast<IMP>(ProbePanel));
+      Method loading = class_getInstanceMethod([WKWebView class], @selector(isLoading));
+      originalLoading = method_setImplementation(loading, reinterpret_cast<IMP>(ProbeLoading));
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+      HostComponent component = CreateComponent(argv[1], argv[5], argv[4]);
+#else
       NSBundle* bundle = [NSBundle bundleWithPath:[NSString stringWithUTF8String:argv[1]]];
       Require([bundle load], "Cannot load the explicit AU bundle");
       CFBundleRef nativeBundle = CFBundleCreate(kCFAllocatorDefault, (__bridge CFURLRef)bundle.bundleURL);
@@ -239,11 +303,12 @@ int main(int argc, char** argv) {
         CFBundleGetFunctionPointerForName(nativeBundle, CFSTR("Track2stem_Factory")));
       Require(factory != nullptr, "The AU factory symbol is missing");
       const AudioComponentDescription description {kAudioUnitType_Effect, 'T2St', 'T2Sm', 0, 0};
-      AudioComponent component = AudioComponentRegister(&description, CFSTR("Track2stem: Track2stem"), 256, factory);
+      HostComponent component = AudioComponentRegister(&description, CFSTR("Track2stem: Track2stem"), 256, factory);
       Require(component != nullptr, "Cannot register the explicit AU factory");
+#endif
       NSData* source = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:argv[5]]];
       Require(source.length > 44, "The generated WAV fixture is missing");
-      __strong NSDictionary* saved;
+      SavedState saved {};
       Audio audio;
       {
         Instance first;
@@ -252,22 +317,42 @@ int main(int argc, char** argv) {
         SelectFile(web, source, @"native-demo.wav");
         JavaScript(web, @"document.querySelector('.upload-button').click()");
         Require(Wait([&] { audio.Render(first.unit); return HasText(web, @"Separation complete"); }, 90), "Native import/separation did not complete");
-        JavaScript(web, @"document.querySelector('button[aria-label=\"Download bass\"]').click()");
-        Require(Wait([&] { return HasText(web, @"File exported."); }, 15), "Native export did not finish through the OS download adapter");
+        {
+          LoadingExportScope loadingExport(web);
+          JavaScript(web, @"document.querySelector('button[aria-label=\"Download bass\"]').click()");
+          const bool exportFinished = Wait([&] { audio.Render(first.unit); return HasText(web, @"File exported."); }, 15);
+          if (!exportFinished)
+            std::fprintf(stderr, "Export UI loading=%d body=%s\n", static_cast<int>([web isLoading]),
+                         [[JavaScript(web, @"document.body.innerText") description] UTF8String]);
+          Require(exportFinished, "Native export did not finish through the OS download adapter");
+        }
         NSArray* files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:exportRoot error:nil];
         Require(files.count == 1, "Native export did not create exactly one owned file");
         NSData* exported = [NSData dataWithContentsOfFile:[exportRoot stringByAppendingPathComponent:files[0]]];
         Require(exported.length > 44 && std::memcmp(exported.bytes, "RIFF", 4) == 0, "Native export is not a real WAV");
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+        first.unit->pause();
+        audio.reference->pause();
+#endif
+        JavaScript(web, @"window.__probeExportCompletions=0;window.addEventListener('track2stem-native-message',event=>{"
+                        "if(event.detail.type==='native_notice'&&event.detail.message==='File exported.')window.__probeExportCompletions++;});null");
+        {
+          LoadingExportScope loadingExport(web);
+          JavaScript(web, @"document.querySelector('button[aria-label=\"Download drums\"]').click()");
+          Require(Wait([&] { return [JavaScript(web, @"window.__probeExportCompletions>0") boolValue]; }, 15),
+                  "Native export completion depended on transport/audio callbacks");
+        }
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+        first.unit->play();
+        audio.reference->play();
+#endif
         exportMode = 1;
         JavaScript(web, @"document.querySelector('button[aria-label=\"Download bass\"]').click()");
         Require(Wait([&] { return HasText(web, @"Export cancelled."); }, 15), "Cancelled native export did not report cancellation");
         exportMode = 2;
         JavaScript(web, @"document.querySelector('button[aria-label=\"Download bass\"]').click()");
         Require(Wait([&] { return HasText(web, @"Export failed."); }, 15), "Native export failure was not surfaced");
-        CFPropertyListRef state = nullptr;
-        UInt32 size = sizeof(state);
-        Check(AudioUnitGetProperty(first.unit, kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0, &state, &size), "Cannot save the actual DAW state");
-        saved = CFBridgingRelease(state);
+        saved = SaveState(first);
       }
       {
         Instance reopened;
@@ -282,6 +367,18 @@ int main(int argc, char** argv) {
         JavaScript(web, @"document.querySelector('button[aria-label=\"Download bass\"]').click()");
         Require(Wait([&] { return HasText(web, @"Export failed."); }, 15), "A missing cached stem was falsely reported as an exported file");
         Require([[NSFileManager defaultManager] moveItemAtPath:backup toPath:cached error:nil], "Cannot restore the owned cached stem");
+        NSMutableData* corrupt = [NSMutableData dataWithLength:128];
+        auto* bytes = static_cast<uint8_t*>(corrupt.mutableBytes);
+        std::memcpy(bytes, "RIFF", 4);
+        std::memcpy(bytes + 8, "WAVEfmt ", 8);
+        SelectFile(web, corrupt, @"native-invalid.wav");
+        JavaScript(web, @"document.querySelector('.upload-button').click()");
+        Require(Wait([&] {
+          audio.Render(reopened.unit);
+          return [JavaScript(web, @"JSON.parse(window.track2stemHost.storage.getItem('track2stem_current_job'))?.status==='failed'") boolValue];
+        }, 30), "Malformed native audio did not produce a failed processing state");
+        Require([JavaScript(web, @"document.body.innerText.toLowerCase().includes('failed')") boolValue],
+                "The native processing failure was not visible in the editor");
         SelectFile(web, source, @"native-long.wav", 20);
         JavaScript(web, @"document.querySelector('.upload-button').click()");
         Require(Wait([&] { audio.Render(reopened.unit); return HasText(web, @"Cancel job"); }, 10), "The running native job cannot be cancelled");
@@ -305,8 +402,15 @@ int main(int argc, char** argv) {
         Require(Wait([&] { audio.Render(reopened.unit); return HasText(web, @"Processed audio is missing or this job was interrupted"); }, 45), "Restart did not preserve the interrupted-job recovery policy");
       }
       Require(Wait([&] { return OwnedWorker(argv[2]) == 0; }, 5), "Plugin removal left an owned worker running");
+#ifdef TRACK2STEM_STUDIO_DUO_PROBE
+      Require(audio.audibleBlocks > 10, "The Studio Duo workflow did not exercise audible generated playback");
+      std::printf("{\"host\":\"Studio Duo %s\",\"format\":\"%s\",\"mode\":\"trustedInProcess\","
+                  "\"project_package_roundtrip\":true,\"audible_playback_blocks\":%d}\n",
+                  STUDIO_DUO_VERSION, component.description.pluginFormatName.toRawUTF8(), audio.audibleBlocks);
+#endif
       std::printf("{\"status\":\"pass\",\"audio_device_opened\":false,\"native_import_export\":true,"
                   "\"save_restore\":true,\"processing_cancellation\":true,\"missing_resource_failure\":true,"
+                  "\"failed_processing\":true,\"paused_export\":true,\"loading_export_status\":true,"
                   "\"worker_crash_recovery\":true,\"worker_teardown\":true,\"maximum_render_microseconds\":%.3f}\n",
                   audio.maximumRenderMicros);
       return 0;

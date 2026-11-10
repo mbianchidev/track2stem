@@ -378,6 +378,10 @@ def main():
         import onnxruntime
         import faster_whisper
         import yt_dlp
+        import beat_this.inference
+        import safetensors.torch
+        import sklearn.decomposition
+        import asteroid_filterbanks
         if torch.version.cuda is not None:
             raise RuntimeError("The native runtime must be CPU-only")
         run_command([ffmpeg(), "-version"], timeout=10)

@@ -15,6 +15,7 @@ def main(arguments=None):
     parser.add_argument("--weights", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--parent-pid", type=int)
+    parser.add_argument("--beam-size", type=int, choices=range(1, 9), default=5)
     args = parser.parse_args(arguments)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -29,7 +30,7 @@ def main(arguments=None):
         import torch
         import torchaudio
         from safetensors.torch import load_file
-        from .events import attack_envelope, decode_tokens
+        from .events import attack_envelope, decode_tokens, refine_tom_registers, supported_onset, tom_frequency
         from .network import DrumModel
 
         check_owner()
@@ -42,7 +43,7 @@ def main(arguments=None):
         model.load_state_dict(load_file(args.weights, device="cpu"), strict=True, assign=True)
         model.eval()
         check_owner()
-        notes = []
+        notes, unsupported = [], 0
         with sf.SoundFile(args.input) as source:
             if not 0 < source.frames / source.samplerate <= 3600:
                 raise ValueError("Drum audio must be non-empty and no longer than 60 minutes")
@@ -74,23 +75,42 @@ def main(arguments=None):
                 gain = min(16., .8 / peak)
                 padded = torch.zeros((1, 61440))
                 padded[0, :min(61440, len(waveform))] = waveform[:61440] * gain
-                tokens = model.sample(padded, check_owner)
+                tokens = model.sample(padded, check_owner, beam_size=args.beam_size)
                 offset, end = first / source.samplerate, source.frames / source.samplerate
                 for note in decode_tokens(tokens):
-                    start = note["start"] + offset
+                    onset = supported_onset(note["start"], attacks, attack_threshold)
+                    if onset is None:
+                        if center / source.samplerate <= note["start"] + offset < (center + step) / source.samplerate:
+                            unsupported += 1
+                        continue
+                    start = onset + offset
                     if not center / source.samplerate <= start < min(end, (center + step) / source.samplerate):
                         continue
+                    frequency = (tom_frequency(waveform[round((onset + .02) * 24000):round((onset + .17) * 24000)].numpy(), 24000)
+                                 if note["pitch"] in {41, 47, 50} else None)
                     notes.append({**note, "start": round(start, 5),
-                                  "end": round(min(note["end"] + offset, end), 5),
+                                  "end": round(min(start + .1, end), 5), "_tom_frequency": frequency,
                                   "velocity": max(1, min(127, round(note["velocity"] / math.sqrt(gain))))})
                 print("T2S_DRUM_PROGRESS " + json.dumps({"completed": index + 1, "total": total}), flush=True)
         check_owner()
+        unique = {}
+        for note in notes:
+            key = note["start"], note["pitch"]
+            if key not in unique or unique[key]["velocity"] < note["velocity"]:
+                unique[key] = note
+        notes = list(unique.values())
+        frequencies = [note.pop("_tom_frequency") for note in notes]
+        notes, tom_registers = refine_tom_registers(notes, frequencies)
+        logging.info("Drum evidence: %d unsupported release events excluded; relative tom registers: %s",
+                     unsupported, tom_registers)
         notes.sort(key=lambda note: (note["start"], note["pitch"]))
         temporary = args.output.with_suffix(".part")
         try:
             temporary.write_text(json.dumps({"version": 1, "model": "ADT_STR", "weights_sha256": weight_hash,
                                              "license": "CC-BY-SA-4.0",
-                                             "preprocessing": "bounded peak normalization; overlapping context; release-only window suppression; input-gain velocity compensation",
+                                             "decoder": f"grammar-constrained beam search, width {args.beam_size}",
+                                             "preprocessing": "bounded peak normalization; overlapping context; acoustic onset support/alignment; input-gain velocity compensation",
+                                             "excluded_unsupported_events": unsupported, "tom_registers": tom_registers,
                                              "notes": notes}, allow_nan=False),
                                  encoding="utf-8")
             temporary.replace(args.output)
