@@ -141,6 +141,6 @@ Nginx serves the production frontend and proxies `/api` to the backend. Vite use
 
 ## Documentation screenshot
 
-[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows the graphite-and-amber studio workspace, a generated WAV selected in **Source audio**, its browser-rendered waveform, and the adjacent **Separation settings** panel. The jobs-list response was mocked as empty to isolate the UI capture from backend state; no upload or model inference was performed.
+[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows the graphite-and-orange interface, a generated WAV selected in **Source audio**, its browser-rendered waveform, and the adjacent **Separation settings** panel. The jobs-list response was mocked as empty to isolate the UI capture from backend state; no upload or model inference was performed.
 
 To refresh it, run the frontend locally, use a fresh browser context at a 1440 px desktop width, select generated audio with a neutral filename, wait for the waveform, fonts, and control transitions to finish rendering, and capture the full unmodified interface. Do not use personal audio, production jobs, or fabricated completed-job results.

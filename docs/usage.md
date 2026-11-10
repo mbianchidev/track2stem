@@ -46,7 +46,7 @@ The **Advanced tuning** control expands these options inside **Separation settin
 
 Leave segment size at **Default** initially. Larger overlap, additional shifts, and fine-tuned models can increase processing time.
 
-The processor adds Demucs's `--shifts` argument only for positive values; `0`, labeled **Upstream default**, leaves the upstream CLI default in effect. It does not guarantee that Demucs shift augmentation is disabled.
+The processor adds Demucs's `--shifts` argument only for positive values; `0`, labeled **Default**, leaves the upstream CLI default in effect. It does not guarantee that Demucs shift augmentation is disabled.
 
 ## Progress, previews, and history
 

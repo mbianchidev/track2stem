@@ -472,7 +472,7 @@ function App() {
           <div className="header-links">
             <span className="host-label">Self-hosted audio separation</span>
             <a href="https://github.com/mbianchidev/track2stem/blob/main/docs/usage.md" target="_blank" rel="noreferrer">
-              Quick guide <Icon name="arrow" />
+              Usage guide <Icon name="arrow" />
             </a>
           </div>
         </div>
@@ -481,8 +481,8 @@ function App() {
       <main className="App-main" id="main-content" tabIndex={-1}>
         <div className="workspace-heading">
           <div>
-            <h1>One track. <span>Every part.</span></h1>
-            <p className="workspace-description">Separate vocals and instruments. Keep what you need.</p>
+            <h1>Separate audio <span>into stems</span></h1>
+            <p className="workspace-description">Extract vocals, drums, bass, and other instruments.</p>
           </div>
           <a className="history-link" href="#recent-jobs">Recent jobs <Icon name="arrow" /></a>
         </div>
@@ -510,8 +510,8 @@ function App() {
                 <Icon name={file ? 'file' : 'upload'} />
               </div>
               <div className="source-picker-copy">
-                <h3 title={file?.name}>{file ? file.name : 'Start with your track'}</h3>
-                <p>{file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB / Ready to separate` : 'Choose an audio file to find out what is inside.'}</p>
+                <h3 title={file?.name}>{file ? file.name : 'No audio selected'}</h3>
+                {file && <p>{(file.size / (1024 * 1024)).toFixed(2)} MB</p>}
               </div>
               <span className="choose-file-button" aria-hidden="true">
                 Choose audio file <Icon name="arrow" />
@@ -568,7 +568,7 @@ function App() {
                   />
                   <span className="mode-copy">
                     <span className="mode-label">Isolate one</span>
-                    <span className="mode-desc">One instrument and a combined backing track</span>
+                    <span className="mode-desc">One stem plus a backing track</span>
                   </span>
                 </label>
                 {stemMode === 'isolate' && (
@@ -593,7 +593,7 @@ function App() {
                   <option value="htdemucs">htdemucs / Hybrid Transformer</option>
                   <option value="htdemucs_ft">htdemucs_ft / Fine-tuned, slower</option>
                   <option value="hdemucs_mmi">hdemucs_mmi / Hybrid v3</option>
-                  <option value="mdx">mdx / MDX challenge winner</option>
+                  <option value="mdx">mdx</option>
                   <option value="mdx_extra">mdx_extra / Extra training data</option>
                   <option value="mdx_q">mdx_q / Quantized, smaller</option>
                   <option value="mdx_extra_q">mdx_extra_q / Extra, quantized</option>
@@ -615,7 +615,7 @@ function App() {
                   ))}
                 </div>
                 <p className="setting-help">
-                  {outputFormat === 'mp3' ? '320 kbps / smaller files' : outputFormat === 'wav' ? 'Uncompressed audio / larger files' : 'Lossless audio / compressed files'}
+                  {outputFormat === 'mp3' ? '320 kbps' : outputFormat === 'wav' ? 'Uncompressed audio' : 'Lossless compression'}
                 </p>
               </fieldset>
 
@@ -661,7 +661,7 @@ function App() {
                       <div className="setting-group">
                         <label className="setting-label" htmlFor="shifts-select">Shifts (quality)</label>
                         <select id="shifts-select" value={shifts} onChange={(e) => setShifts(e.target.value)} disabled={uploading}>
-                          <option value="0">0 / Upstream default</option>
+                          <option value="0">0 / Default</option>
                           <option value="1">1</option>
                           <option value="2">2</option>
                           <option value="5">5</option>
@@ -715,8 +715,8 @@ function App() {
                   <rect x="152" y="30" width="20" height="12" rx="2" />
                   <rect x="152" y="54" width="20" height="12" rx="2" />
                 </svg>
-                <h3>Your stems will appear here</h3>
-                <p>Choose your source and start separation.<br />Each part gets a waveform and a download.</p>
+                <h3>No stems yet</h3>
+                <p>Choose a file, then click Upload &amp; Process.</p>
                 <div className="expected-stems" aria-label="Expected outputs">
                   {expectedStems.map((stem) => <span key={stem}>{stemLabel(stem)}</span>)}
                 </div>
@@ -738,7 +738,7 @@ function App() {
                       <span><Icon name="clock" /> Elapsed <span role="timer" aria-label="Elapsed processing time" aria-live="off">{formatElapsedTime(elapsedTime)}</span></span>
                       <span>CPU separation</span>
                     </div>
-                    <p className="processing-note">The model is separating your audio. Track length, model, and quality settings affect processing time.</p>
+                    <p className="processing-note">Processing time depends on track length, model, and quality settings.</p>
                     {statusWarning && <p className="inline-notice" role="status">{statusWarning}</p>}
                     {progressWarning && <p className="inline-notice" role="status">{progressWarning}</p>}
                   </div>
@@ -746,7 +746,7 @@ function App() {
                 {currentJob.status === 'completed' && currentJob.output_files && (
                   <>
                     <p className="completed-summary">
-                      <Icon name="check" /> Ready to make something new
+                      <Icon name="check" /> Separation complete
                       {(currentJob.processing_time || elapsedTime > 0) && (
                         <span>Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</span>
                       )}
@@ -783,11 +783,11 @@ function App() {
               <h2 id="history-heading" ref={historyHeadingRef} tabIndex={-1}><Icon name="clock" /> Recent jobs</h2>
               <span className="panel-label">Local history</span>
             </div>
-            <p className="history-note">History is stored in this browser; downloads depend on the server.</p>
+            <p className="history-note">This browser stores job history. Your server stores the audio.</p>
             {historyError && <p className="error history-error" role="alert">{historyError}</p>}
             {jobsLoading && <p className="history-empty" role="status">Loading recent jobs...</p>}
             {!jobsLoading && !historyError && jobs.length === 0 && (
-              <div className="history-empty"><p>No recent jobs</p><span>Your separations will appear here.</span></div>
+              <div className="history-empty"><p>No recent jobs</p></div>
             )}
             <div className="history-list">
               {jobs.slice().reverse().slice(0, 10).map((job) => (

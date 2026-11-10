@@ -73,17 +73,19 @@ describe('App', () => {
   test('renders the source, settings, results, and browser-local history', async () => {
     await renderApp();
     expect(screen.getByRole('link', { name: 'Track2stem workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Separate audio into stems' })).toBeInTheDocument();
+    expect(screen.getByText('No audio selected')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Source audio' })).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Separation settings' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Separated stems' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Recent jobs' })).toHaveTextContent(/stored in this browser/i);
+    expect(screen.getByRole('region', { name: 'Recent jobs' })).toHaveTextContent(/This browser stores job history/i);
     expect(screen.getByText(/Powered by Demucs/i)).toBeInTheDocument();
   });
 
   test('disables processing until a file is selected', async () => {
     await renderApp();
     expect(screen.getByRole('button', { name: 'Upload & Process' })).toBeDisabled();
-    expect(screen.getByText('Your stems will appear here')).toBeInTheDocument();
+    expect(screen.getByText('No stems yet')).toBeInTheDocument();
   });
 
   test('provides a labeled picker for the existing audio formats', async () => {
@@ -258,6 +260,7 @@ describe('App', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     await renderApp();
     const results = within(screen.getByRole('region', { name: 'Separated stems' }));
+    expect(results.getByText('Separation complete')).toBeInTheDocument();
     for (const stem of stems) {
       expect(results.getByRole('img', { name: `${stem[0].toUpperCase() + stem.slice(1)} waveform` })).toBeInTheDocument();
       fireEvent.click(results.getByRole('button', { name: `Download ${stem}` }));

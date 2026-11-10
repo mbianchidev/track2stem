@@ -95,7 +95,7 @@ const Spectrogram = ({ audioUrl, audioFile, title, label, height = 100 }) => {
       ctx.moveTo(0, centerY);
       ctx.lineTo(width, centerY);
       ctx.stroke();
-      ctx.fillStyle = theme.getPropertyValue('--color-accent-primary').trim() || '#e9ad45';
+      ctx.fillStyle = theme.getPropertyValue('--color-accent-primary').trim() || '#f28c38';
 
       for (let x = 0; x < width; x++) {
         const start = Math.floor(x * channelData.length / width);
