@@ -6,7 +6,7 @@
 
 [Documentation](docs/README.md) | [Report a bug](https://github.com/mbianchidev/track2stem/issues) | [Roadmap](docs/roadmap.md)
 
-![Track2stem upload screen showing a generated audio waveform, stem modes, output formats, and model selection](docs/images/track2stem.png)
+![Track2stem studio workspace with a generated source waveform, separation settings, and output area](docs/images/track2stem.png)
 
 *The upload workflow with a generated WAV sample. No personal audio or simulated separation results are shown.*
 

@@ -3,7 +3,6 @@ import axios from 'axios';
 import './App.css';
 import Spectrogram from './Spectrogram.jsx';
 
-// LocalStorage keys
 const STORAGE_KEYS = {
   JOBS: 'track2stem_jobs',
   CURRENT_JOB: 'track2stem_current_job',
@@ -11,6 +10,42 @@ const STORAGE_KEYS = {
   PROCESSING_PROGRESS: 'track2stem_progress',
   INPUT_FILE_NAME: 'track2stem_input_filename',
 };
+
+const SIX_STEM_MODELS = ['htdemucs_6s'];
+const SIX_STEMS = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+const FOUR_STEMS = ['vocals', 'drums', 'bass', 'other'];
+const ICON_PATHS = {
+  upload: 'M12 16V4m-5 5 5-5 5 5M4 16v4h16v-4',
+  file: 'M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 13h8m-8 4h5',
+  settings: 'M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6',
+  arrow: 'M5 12h14m-6-6 6 6-6 6',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
+  chevron: 'm6 9 6 6 6-6',
+  close: 'm6 6 12 12M6 18 18 6',
+  trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
+  clock: 'M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+  check: 'm5 12 4 4L19 6',
+  split: 'M4 12h6m0 0 5-6h5m-10 6 5 6h5M17 3l3 3-3 3m0 6 3 3-3 3',
+};
+
+function Icon({ name, className = '' }) {
+  return (
+    <svg className={`icon ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d={ICON_PATHS[name]} />
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+      <path d="M7 13v6m6-12v18m6-15v12m6-8v4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const stemLabel = (stem) => stem.charAt(0).toUpperCase() + stem.slice(1);
 
 function App() {
   const [file, setFile] = useState(null);
@@ -25,6 +60,11 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState(0); // elapsed seconds
   const [isInitialized, setIsInitialized] = useState(false); // Track if localStorage has been loaded
   const [showAdvanced, setShowAdvanced] = useState(false); // Toggle advanced options
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [statusWarning, setStatusWarning] = useState('');
+  const [progressWarning, setProgressWarning] = useState('');
+  const [modelNotice, setModelNotice] = useState('');
 
   // Advanced options
   const [outputFormat, setOutputFormat] = useState('mp3');
@@ -36,12 +76,19 @@ function App() {
 
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const historyHeadingRef = useRef(null);
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
-  // Models that produce 6 stems (guitar + piano)
-  const SIX_STEM_MODELS = ['htdemucs_6s'];
   const isSixStemModel = SIX_STEM_MODELS.includes(model);
+  const availableStems = isSixStemModel ? SIX_STEMS : FOUR_STEMS;
+  const expectedStems = stemMode === 'all'
+    ? availableStems
+    : [isolateStem, isolateStem === 'vocals' ? 'instrumental' : 'backing'];
+  const currentProgress = Number.isFinite(processingProgress.progress)
+    ? Math.max(0, Math.min(100, processingProgress.progress))
+    : null;
 
   // Format elapsed time as Xm Ys
   const formatElapsedTime = (seconds) => {
@@ -139,6 +186,9 @@ function App() {
         
       } catch (err) {
         console.error('Failed to fetch jobs:', err);
+        setHistoryError('Could not refresh recent jobs. Saved history is still shown; check the server connection and refresh.');
+      } finally {
+        setJobsLoading(false);
       }
     };
 
@@ -191,6 +241,7 @@ function App() {
       const response = await axios.get(`${API_BASE}/jobs/${jobId}`);
       const updatedJob = response.data;
       setCurrentJob(updatedJob);
+      setStatusWarning('');
       
       if (updatedJob.status === 'completed' || updatedJob.status === 'failed') {
         // Update the job in our jobs list with processing time
@@ -203,6 +254,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to fetch job status:', err);
+      setStatusWarning('Could not refresh this job. Retrying automatically; check the server connection.');
     }
   }, [API_BASE]);
 
@@ -211,11 +263,13 @@ function App() {
       const response = await axios.get(`${API_BASE}/processing-status/${jobId}`);
       if (response.data) {
         setProcessingProgress(response.data);
+        setProgressWarning('');
         // Persist progress to localStorage
         localStorage.setItem(STORAGE_KEYS.PROCESSING_PROGRESS, JSON.stringify(response.data));
       }
     } catch (err) {
-      // Silently ignore - progress endpoint may not be available
+      console.warn('Failed to fetch processing progress:', err);
+      setProgressWarning('Live progress is unavailable. Job status will continue to update.');
     }
   }, [API_BASE]);
 
@@ -256,7 +310,18 @@ function App() {
     }
   };
 
-  const handleUpload = async () => {
+  const handleModelChange = (event) => {
+    const nextModel = event.target.value;
+    setModel(nextModel);
+    setModelNotice('');
+    if (!SIX_STEM_MODELS.includes(nextModel) && ['guitar', 'piano'].includes(isolateStem)) {
+      setIsolateStem('vocals');
+      setModelNotice('Isolation changed to vocals. Guitar and piano require the six-stem model.');
+    }
+  };
+
+  const handleUpload = async (event) => {
+    event.preventDefault();
     if (!file) {
       setError('Please select a file');
       return;
@@ -280,6 +345,8 @@ function App() {
     setUploading(true);
     setUploadProgress(0);
     setError('');
+    setStatusWarning('');
+    setProgressWarning('');
     
     // Save input file name to localStorage
     localStorage.setItem(STORAGE_KEYS.INPUT_FILE_NAME, file.name);
@@ -299,7 +366,9 @@ function App() {
           'Content-Type': 'multipart/form-data',
         },
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          const percentCompleted = progressEvent.total
+            ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            : null;
           setUploadProgress(percentCompleted);
         },
       });
@@ -307,8 +376,7 @@ function App() {
       setCurrentJob(response.data);
       setFile(null);
       // Reset file input
-      const fileInput = document.getElementById('file-input');
-      if (fileInput) fileInput.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       const status = err.response?.status;
       const data = err.response?.data;
@@ -317,10 +385,9 @@ function App() {
       if (status === 413) {
         message = 'File is too large. Maximum allowed size is 100 MB.';
       } else if (typeof data === 'string' && data.includes('<html')) {
-        // Server returned an HTML error page — show a generic message
         message = 'The server rejected the request. The file may be too large (max 100 MB).';
       } else {
-        message = data || err.message;
+        message = typeof data === 'string' ? data : data?.error || err.message || 'The request could not be completed.';
       }
 
       setError('Upload failed: ' + message);
@@ -330,7 +397,7 @@ function App() {
   };
 
   const handleDownload = (jobId, stem) => {
-    window.open(`${API_BASE}/download/${jobId}/${stem}`, '_blank');
+    window.open(getDownloadUrl(jobId, stem), '_blank');
   };
 
   const handleDeleteJob = async (jobId) => {
@@ -368,6 +435,7 @@ function App() {
       startTimeRef.current = null;
       setElapsedTime(0);
     }
+    historyHeadingRef.current?.focus();
   };
 
   const handleClearCurrentJob = () => {
@@ -379,6 +447,9 @@ function App() {
     localStorage.removeItem(STORAGE_KEYS.INPUT_FILE_NAME);
     startTimeRef.current = null;
     setElapsedTime(0);
+    setStatusWarning('');
+    setProgressWarning('');
+    fileInputRef.current?.focus();
   };
 
   const formatDate = (dateString) => {
@@ -391,35 +462,89 @@ function App() {
 
   return (
     <div className="App">
+      <a className="skip-link" href="#main-content">Skip to workspace</a>
       <header className="App-header">
-        <h1>🎵 Track2stem</h1>
-        <p>Turn any track into multi-stem</p>
+        <div className="header-inner">
+          <a className="brand" href="#main-content" aria-label="Track2stem workspace">
+            <BrandMark />
+            <span>Track2stem</span>
+          </a>
+          <div className="header-links">
+            <span className="host-label">Self-hosted audio separation</span>
+            <a href="https://github.com/mbianchidev/track2stem/blob/main/docs/usage.md" target="_blank" rel="noreferrer">
+              Usage guide <Icon name="arrow" />
+            </a>
+          </div>
+        </div>
       </header>
 
-      <main className="App-main">
-        <div className="upload-section">
-          <h2>Upload Audio File</h2>
-          <div className="upload-box">
-            <input
-              id="file-input"
-              type="file"
-              accept=".mp3,.wav,.flac,.ogg,.m4a,.aac,audio/*"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
-            {file && <p className="file-name">Selected: {file.name}</p>}
-            
-            {/* Waveform for input file - show when file is selected */}
+      <main className="App-main" id="main-content" tabIndex={-1}>
+        <div className="workspace-heading">
+          <div>
+            <h1>Separate audio <span>into stems</span></h1>
+            <p className="workspace-description">Extract vocals, drums, bass, and other instruments.</p>
+          </div>
+          <a className="history-link" href="#recent-jobs">Recent jobs <Icon name="arrow" /></a>
+        </div>
+
+        <div className="workspace-grid">
+          <section className="panel source-panel" aria-labelledby="source-heading">
+            <div className="panel-header">
+              <h2 id="source-heading"><Icon name="file" /> Source audio</h2>
+              <span className="panel-label">Input</span>
+            </div>
+            <div className={`source-picker ${file ? 'has-file' : ''}`}>
+              <input
+                ref={fileInputRef}
+                id="file-input"
+                className="file-input"
+                type="file"
+                aria-label="Choose audio file"
+                aria-describedby={`source-help${error ? ' source-error' : ''}`}
+                aria-invalid={Boolean(error) && !file}
+                accept=".mp3,.wav,.flac,.ogg,.m4a,.aac,audio/*"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              <div className="source-symbol" aria-hidden="true">
+                <Icon name={file ? 'file' : 'upload'} />
+              </div>
+              <div className="source-picker-copy">
+                <h3 title={file?.name}>{file ? file.name : 'No audio selected'}</h3>
+                {file && <p>{(file.size / (1024 * 1024)).toFixed(2)} MB</p>}
+              </div>
+              <span className="choose-file-button" aria-hidden="true">
+                Choose audio file <Icon name="arrow" />
+              </span>
+            </div>
+            <p className="file-help" id="source-help">
+              <span>MP3, WAV, FLAC, OGG, M4A, AAC</span>
+              <span>Up to 100 MB</span>
+            </p>
             {file && (
-              <div className="input-spectrogram">
-                <Spectrogram audioFile={file} title="📊 Input Audio Waveform" height={80} />
+              <div className="source-waveform">
+                <Spectrogram audioFile={file} title="Source waveform" height={88} />
               </div>
             )}
-            
-            {/* Stem Mode Options */}
-            <div className="stem-options">
-              <h3>Output Mode</h3>
-              <div className="stem-mode-selector">
+            {uploading && (
+              <div className="upload-progress">
+                <div className="progress-caption">
+                  <span>Uploading audio</span>
+                  <span>{uploadProgress === null ? 'Sending...' : `${uploadProgress}%`}</span>
+                </div>
+                <progress aria-label="Upload progress" max="100" value={uploadProgress ?? undefined} />
+              </div>
+            )}
+            {error && <p className="error source-error" role="alert" id="source-error">{error}</p>}
+          </section>
+
+          <form className="panel settings-panel" aria-labelledby="settings-heading" onSubmit={handleUpload} aria-busy={uploading}>
+            <div className="panel-header">
+              <h2 id="settings-heading"><Icon name="settings" /> Separation settings</h2>
+            </div>
+            <div className="settings-body">
+              <fieldset className="settings-fieldset" disabled={uploading}>
+                <legend className="setting-label">Output mode</legend>
                 <label className={`mode-option ${stemMode === 'all' ? 'selected' : ''}`}>
                   <input
                     type="radio"
@@ -427,10 +552,11 @@ function App() {
                     value="all"
                     checked={stemMode === 'all'}
                     onChange={(e) => setStemMode(e.target.value)}
-                    disabled={uploading}
                   />
-                  <span className="mode-label">{isSixStemModel ? '🎼 All 6 Stems' : '🎼 All 4 Stems'}</span>
-                  <span className="mode-desc">{isSixStemModel ? 'Vocals, Drums, Bass, Guitar, Piano, Other' : 'Vocals, Drums, Bass, Other'}</span>
+                  <span className="mode-copy">
+                    <span className="mode-label">All {availableStems.length} stems</span>
+                    <span className="mode-desc">{availableStems.map(stemLabel).join(', ')}</span>
+                  </span>
                 </label>
                 <label className={`mode-option ${stemMode === 'isolate' ? 'selected' : ''}`}>
                   <input
@@ -439,304 +565,267 @@ function App() {
                     value="isolate"
                     checked={stemMode === 'isolate'}
                     onChange={(e) => setStemMode(e.target.value)}
-                    disabled={uploading}
                   />
-                  <span className="mode-label">🎤 Isolate One</span>
-                  <span className="mode-desc">Extract a single stem + combined backing track</span>
+                  <span className="mode-copy">
+                    <span className="mode-label">Isolate one</span>
+                    <span className="mode-desc">One stem plus a backing track</span>
+                  </span>
                 </label>
-              </div>
-              
-              {stemMode === 'isolate' && (
-                <div className="isolate-selector">
-                  <label>Choose stem to isolate:</label>
-                  <select 
-                    value={isolateStem} 
-                    onChange={(e) => setIsolateStem(e.target.value)}
-                    disabled={uploading}
-                  >
-                    <option value="vocals">🎤 Vocals</option>
-                    <option value="drums">🥁 Drums</option>
-                    <option value="bass">🎸 Bass</option>
-                    {isSixStemModel && <option value="guitar">🎸 Guitar</option>}
-                    {isSixStemModel && <option value="piano">🎹 Piano</option>}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Conversion Settings */}
-            <div className="stem-options">
-              <h3>Conversion Settings</h3>
-              <div className="conversion-settings-grid">
-                <fieldset className="setting-group">
-                  <legend className="setting-label">Output Format</legend>
-                  <div className="format-radio-group" role="radiogroup" aria-label="Output Format">
-                    {['mp3', 'wav', 'flac'].map((fmt) => (
-                      <label key={fmt} className={`format-choice ${outputFormat === fmt ? 'active' : ''}`}>
-                        <input
-                          type="radio"
-                          name="outputFormat"
-                          value={fmt}
-                          checked={outputFormat === fmt}
-                          onChange={(e) => setOutputFormat(e.target.value)}
-                          disabled={uploading}
-                        />
-                        {fmt.toUpperCase()}
-                      </label>
-                    ))}
+                {stemMode === 'isolate' && (
+                  <div className="isolate-selector setting-group">
+                    <label className="setting-label" htmlFor="isolate-select">Choose stem to isolate</label>
+                    <select id="isolate-select" value={isolateStem} onChange={(e) => {
+                      setIsolateStem(e.target.value);
+                      setModelNotice('');
+                    }}>
+                      {availableStems.filter((stem) => stem !== 'other').map((stem) => (
+                        <option key={stem} value={stem}>{stemLabel(stem)}</option>
+                      ))}
+                    </select>
                   </div>
-                </fieldset>
+                )}
+              </fieldset>
 
-                <div className="setting-group">
-                  <label className="setting-label" htmlFor="model-select">AI Model</label>
-                  <select
-                    id="model-select"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    disabled={uploading}
-                    className="setting-select"
-                  >
-                    <option value="htdemucs_6s">htdemucs_6s — 6 stems (guitar+piano)</option>
-                    <option value="htdemucs">htdemucs — Hybrid Transformer (default quality)</option>
-                    <option value="htdemucs_ft">htdemucs_ft — Fine-tuned (4× slower, better)</option>
-                    <option value="hdemucs_mmi">hdemucs_mmi — Hybrid v3</option>
-                    <option value="mdx">mdx — MDX challenge winner</option>
-                    <option value="mdx_extra">mdx_extra — MDX with extra training data</option>
-                    <option value="mdx_q">mdx_q — MDX quantized (smaller)</option>
-                    <option value="mdx_extra_q">mdx_extra_q — MDX extra quantized</option>
-                  </select>
-                </div>
+              <div className="setting-group">
+                <label className="setting-label" htmlFor="model-select">AI model</label>
+                <select id="model-select" value={model} onChange={handleModelChange} disabled={uploading}>
+                  <option value="htdemucs_6s">htdemucs_6s / 6 stems</option>
+                  <option value="htdemucs">htdemucs / Hybrid Transformer</option>
+                  <option value="htdemucs_ft">htdemucs_ft / Fine-tuned, slower</option>
+                  <option value="hdemucs_mmi">hdemucs_mmi / Hybrid v3</option>
+                  <option value="mdx">mdx</option>
+                  <option value="mdx_extra">mdx_extra / Extra training data</option>
+                  <option value="mdx_q">mdx_q / Quantized, smaller</option>
+                  <option value="mdx_extra_q">mdx_extra_q / Extra, quantized</option>
+                </select>
+                {modelNotice
+                  ? <p className="setting-help model-notice" role="status">{modelNotice}</p>
+                  : <p className="setting-help">{isSixStemModel ? 'Includes separate guitar and piano tracks.' : 'Vocals, drums, bass, and other instruments.'}</p>}
               </div>
 
-              {/* Collapsible advanced tuning */}
-              <button
-                type="button"
-                className="advanced-toggle"
-                onClick={() => setShowAdvanced((v) => !v)}
-              >
-                {showAdvanced ? '▾ Hide Advanced' : '▸ Advanced Tuning'}
-              </button>
-
-              {showAdvanced && (
-                <div className="advanced-options-panel">
-                  <div className="conversion-settings-grid">
-                    <div className="setting-group">
-                      <label className="setting-label" htmlFor="segment-select">Segment Size</label>
-                      <select
-                        id="segment-select"
-                        value={segment}
-                        onChange={(e) => setSegment(e.target.value)}
-                        disabled={uploading}
-                        className="setting-select"
-                      >
-                        <option value="">Default</option>
-                        <option value="8">8 s (low memory)</option>
-                        <option value="10">10 s</option>
-                        <option value="15">15 s</option>
-                        <option value="20">20 s</option>
-                        <option value="25">25 s</option>
-                        <option value="30">30 s</option>
-                        <option value="40">40 s</option>
-                        <option value="60">60 s (high memory)</option>
-                      </select>
-                    </div>
-
-                    <div className="setting-group">
-                      <label className="setting-label" htmlFor="overlap-select">Overlap</label>
-                      <select
-                        id="overlap-select"
-                        value={overlap}
-                        onChange={(e) => setOverlap(e.target.value)}
-                        disabled={uploading}
-                        className="setting-select"
-                      >
-                        <option value="">Default</option>
-                        <option value="0.1">0.10 (fastest)</option>
-                        <option value="0.15">0.15</option>
-                        <option value="0.2">0.20</option>
-                        <option value="0.25">0.25 (recommended)</option>
-                        <option value="0.3">0.30</option>
-                        <option value="0.35">0.35</option>
-                        <option value="0.4">0.40</option>
-                        <option value="0.5">0.50 (best quality)</option>
-                      </select>
-                    </div>
-
-                    <div className="setting-group">
-                      <label className="setting-label" htmlFor="shifts-select">Shifts (quality)</label>
-                      <select
-                        id="shifts-select"
-                        value={shifts}
-                        onChange={(e) => setShifts(e.target.value)}
-                        disabled={uploading}
-                        className="setting-select"
-                      >
-                        <option value="0">0 — off (fastest)</option>
-                        <option value="1">1 — 2× slower</option>
-                        <option value="2">2 — 3× slower</option>
-                        <option value="5">5 — 6× slower</option>
-                        <option value="10">10 — 11× slower</option>
-                      </select>
-                    </div>
-
-                    <div className="setting-group">
-                      <label className="setting-label" htmlFor="clip-mode-select">Clip Mode</label>
-                      <select
-                        id="clip-mode-select"
-                        value={clipMode}
-                        onChange={(e) => setClipMode(e.target.value)}
-                        disabled={uploading}
-                        className="setting-select"
-                      >
-                        <option value="rescale">Rescale (preserve relative volume)</option>
-                        <option value="clamp">Clamp (hard clip)</option>
-                      </select>
-                    </div>
-                  </div>
+              <fieldset className="settings-fieldset" disabled={uploading}>
+                <legend className="setting-label">Output format</legend>
+                <div className="format-radio-group">
+                  {['mp3', 'wav', 'flac'].map((fmt) => (
+                    <label key={fmt} className={`format-choice ${outputFormat === fmt ? 'active' : ''}`}>
+                      <input type="radio" name="outputFormat" value={fmt} checked={outputFormat === fmt}
+                        onChange={(e) => setOutputFormat(e.target.value)} />
+                      {fmt.toUpperCase()}
+                    </label>
+                  ))}
                 </div>
-              )}
-            </div>
-            
-            <button
-              onClick={handleUpload}
-              disabled={!file || uploading}
-              className="upload-button"
-            >
-              {uploading ? `Uploading... ${uploadProgress}%` : 'Upload & Process'}
-            </button>
-            {uploading && (
-              <div className="progress-container">
-                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
-              </div>
-            )}
-          </div>
-          {error && <p className="error">{error}</p>}
-        </div>
+                <p className="setting-help">
+                  {outputFormat === 'mp3' ? '320 kbps' : outputFormat === 'wav' ? 'Uncompressed audio' : 'Lossless compression'}
+                </p>
+              </fieldset>
 
-        {currentJob && (
-          <div className="current-job">
-            <div className="section-header">
-              <h2>Current Job</h2>
-              {(currentJob.status === 'completed' || currentJob.status === 'failed') && (
-                <button className="clear-button" onClick={handleClearCurrentJob}>
-                  ✕ Clear
+              <div className="advanced-section">
+                <button type="button" className="advanced-toggle" aria-expanded={showAdvanced}
+                  aria-controls="advanced-options" onClick={() => setShowAdvanced((value) => !value)}>
+                  {showAdvanced ? 'Hide advanced' : 'Advanced tuning'}
+                  <Icon name="chevron" className={showAdvanced ? 'is-expanded' : ''} />
                 </button>
-              )}
-            </div>
-            <div className="job-card">
-              <div className="job-header">
-                <span className="job-filename">{currentJob.filename}</span>
-                <span className={`job-status status-${currentJob.status}`}>
-                  {currentJob.status}
-                </span>
-              </div>
-              <p className="job-id">Job ID: {currentJob.id}</p>
-              <p className="job-date">Created: {formatDate(currentJob.created_at)}</p>
-              
-              {(currentJob.status === 'processing' || currentJob.status === 'pending') && (
-                <div className="processing-indicator">
-                  <div className="progress-container large">
-                    <div 
-                      className="progress-bar processing" 
-                      style={{ width: `${processingProgress.progress || 10}%` }}
-                    ></div>
-                  </div>
-                  <p className="progress-text">
-                    {processingProgress.stage || 'Starting processing...'}
-                  </p>
-                  <p className="elapsed-time">⏱️ Elapsed: {formatElapsedTime(elapsedTime)}</p>
-                  <p className="processing-note">🎧 AI is separating your audio stems. This may take 5-15 minutes depending on file size.</p>
-                </div>
-              )}
+                <div id="advanced-options" hidden={!showAdvanced}>
+                  {showAdvanced && (
+                    <div className="advanced-options-panel">
+                      <div className="setting-group">
+                        <label className="setting-label" htmlFor="segment-select">Segment size</label>
+                        <select id="segment-select" value={segment} onChange={(e) => setSegment(e.target.value)} disabled={uploading}>
+                          <option value="">Default</option>
+                          <option value="8">8 s (low memory)</option>
+                          <option value="10">10 s</option>
+                          <option value="15">15 s</option>
+                          <option value="20">20 s</option>
+                          <option value="25">25 s</option>
+                          <option value="30">30 s</option>
+                          <option value="40">40 s</option>
+                          <option value="60">60 s (high memory)</option>
+                        </select>
+                      </div>
 
-              {currentJob.status === 'completed' && currentJob.output_files && (
-                <div className="stems">
-                  <p className="total-time">✅ Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</p>
-                  <h3>Download Stems:</h3>
-                  <div className="stem-buttons">
-                    {Object.keys(currentJob.output_files).map((stem) => (
-                      <button
-                        key={stem}
-                        onClick={() => handleDownload(currentJob.id, stem)}
-                        className="stem-button"
-                        data-stem={stem}
-                      >
-                        <span className="stem-icon">🎼</span>
-                        {stem.charAt(0).toUpperCase() + stem.slice(1)}
-                      </button>
-                    ))}
+                      <div className="setting-group">
+                        <label className="setting-label" htmlFor="overlap-select">Overlap</label>
+                        <select id="overlap-select" value={overlap} onChange={(e) => setOverlap(e.target.value)} disabled={uploading}>
+                          <option value="">Default</option>
+                          <option value="0.1">0.10 (fastest)</option>
+                          <option value="0.15">0.15</option>
+                          <option value="0.2">0.20</option>
+                          <option value="0.25">0.25 (recommended)</option>
+                          <option value="0.3">0.30</option>
+                          <option value="0.35">0.35</option>
+                          <option value="0.4">0.40</option>
+                          <option value="0.5">0.50 (best quality)</option>
+                        </select>
+                      </div>
+
+                      <div className="setting-group">
+                        <label className="setting-label" htmlFor="shifts-select">Shifts (quality)</label>
+                        <select id="shifts-select" value={shifts} onChange={(e) => setShifts(e.target.value)} disabled={uploading}>
+                          <option value="0">0 / Default</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                        </select>
+                      </div>
+
+                      <div className="setting-group">
+                        <label className="setting-label" htmlFor="clip-mode-select">Clip mode</label>
+                        <select id="clip-mode-select" value={clipMode} onChange={(e) => setClipMode(e.target.value)} disabled={uploading}>
+                          <option value="rescale">Rescale</option>
+                          <option value="clamp">Clamp (hard clip)</option>
+                        </select>
+                      </div>
+                      <p className="setting-help advanced-help">More overlap and shifts can improve quality but take longer. Rescale preserves relative volume.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-action">
+                <button type="submit" disabled={!file || uploading} className="upload-button">
+                  {uploading ? `Uploading...${uploadProgress === null ? '' : ` ${uploadProgress}%`}` : 'Upload & Process'}
+                  <Icon name="arrow" />
+                </button>
+                <p className="setting-footnote">Processing runs on your server's CPU.</p>
+              </div>
+            </div>
+          </form>
+
+          <section className="panel results-panel" aria-labelledby="results-heading">
+            <div className="panel-header">
+              <h2 id="results-heading"><Icon name="split" /> Separated stems</h2>
+              {currentJob && ['completed', 'failed'].includes(currentJob.status)
+                ? <button type="button" className="quiet-button" onClick={handleClearCurrentJob} aria-label="Clear current job">
+                  <Icon name="close" /> Clear
+                </button>
+                : <span className="panel-label">{currentJob ? 'Current job' : 'Output'}</span>}
+            </div>
+            <p className="sr-only" role="status" aria-atomic="true">
+              {currentJob?.status === 'completed' ? 'Separation completed. Stems are ready to download.'
+                : currentJob?.status === 'failed' ? 'Separation failed.'
+                  : currentJob ? processingProgress.stage || 'Waiting for separation.' : ''}
+            </p>
+            {!currentJob ? (
+              <div className="results-empty">
+                <svg className="routing-diagram" viewBox="0 0 180 72" fill="none" aria-hidden="true">
+                  <path d="M8 36h48m0 0c22 0 22-24 44-24h52M56 36h96M56 36c22 0 22 24 44 24h52" />
+                  <rect x="4" y="28" width="8" height="16" rx="2" />
+                  <rect x="152" y="6" width="20" height="12" rx="2" />
+                  <rect x="152" y="30" width="20" height="12" rx="2" />
+                  <rect x="152" y="54" width="20" height="12" rx="2" />
+                </svg>
+                <h3>No stems yet</h3>
+                <p>Choose a file, then click Upload &amp; Process.</p>
+                <div className="expected-stems" aria-label="Expected outputs">
+                  {expectedStems.map((stem) => <span key={stem}>{stemLabel(stem)}</span>)}
+                </div>
+              </div>
+            ) : (
+              <div className="current-job">
+                <div className="job-summary">
+                  <h3 className="job-filename">{currentJob.filename}</h3>
+                  <span className={`job-status status-${currentJob.status}`}>{currentJob.status}</span>
+                </div>
+                {['processing', 'pending'].includes(currentJob.status) && (
+                  <div className="processing-panel">
+                    <div className="progress-caption">
+                      <span>{processingProgress.stage || 'Waiting for the processor...'}</span>
+                      <span>{currentProgress === null ? 'Waiting...' : `${Math.round(currentProgress)}%`}</span>
+                    </div>
+                    <progress aria-label="Separation progress" max="100" value={currentProgress ?? undefined} />
+                    <div className="processing-meta">
+                      <span><Icon name="clock" /> Elapsed <span role="timer" aria-label="Elapsed processing time" aria-live="off">{formatElapsedTime(elapsedTime)}</span></span>
+                      <span>CPU separation</span>
+                    </div>
+                    <p className="processing-note">Processing time depends on track length, model, and quality settings.</p>
+                    {statusWarning && <p className="inline-notice" role="status">{statusWarning}</p>}
+                    {progressWarning && <p className="inline-notice" role="status">{progressWarning}</p>}
                   </div>
-                  
-                  {/* Spectrograms for output stems */}
-                  <div className="output-spectrograms">
-                    <h3>📊 Output Spectrograms:</h3>
-                    <div className="spectrograms-grid">
+                )}
+                {currentJob.status === 'completed' && currentJob.output_files && (
+                  <>
+                    <p className="completed-summary">
+                      <Icon name="check" /> Separation complete
+                      {(currentJob.processing_time || elapsedTime > 0) && (
+                        <span>Processed in {currentJob.processing_time || formatElapsedTime(elapsedTime)}</span>
+                      )}
+                    </p>
+                    <div className="stem-lanes">
                       {Object.keys(currentJob.output_files).map((stem) => (
-                        <Spectrogram 
-                          key={stem}
-                          audioUrl={getDownloadUrl(currentJob.id, stem)}
-                          title={stem.charAt(0).toUpperCase() + stem.slice(1)}
-                          height={60}
-                        />
+                        <div className="stem-lane" key={stem}>
+                          <h3 className="stem-name">{stemLabel(stem)}</h3>
+                          <div className="stem-waveform">
+                            <Spectrogram audioUrl={getDownloadUrl(currentJob.id, stem)} label={`${stemLabel(stem)} waveform`} height={52} />
+                          </div>
+                          <button type="button" className="download-button" aria-label={`Download ${stem}`} onClick={() => handleDownload(currentJob.id, stem)}>
+                            <Icon name="download" /> Download
+                          </button>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              )}
+                  </>
+                )}
+                {currentJob.status === 'failed' && <p className="error" role="alert">Separation failed: {currentJob.error}</p>}
+                <details className="job-details">
+                  <summary>Job details</summary>
+                  <dl>
+                    <div><dt>Job ID</dt><dd>{currentJob.id}</dd></div>
+                    <div><dt>Created</dt><dd>{formatDate(currentJob.created_at)}</dd></div>
+                  </dl>
+                </details>
+              </div>
+            )}
+          </section>
 
-              {currentJob.status === 'failed' && (
-                <p className="error">Error: {currentJob.error}</p>
-              )}
+          <section className="panel history-panel" id="recent-jobs" aria-labelledby="history-heading">
+            <div className="panel-header">
+              <h2 id="history-heading" ref={historyHeadingRef} tabIndex={-1}><Icon name="clock" /> Recent jobs</h2>
+              <span className="panel-label">Local history</span>
             </div>
-          </div>
-        )}
-
-        {jobs.length > 0 && (
-          <div className="jobs-section">
-            <h2>Recent Jobs</h2>
-            <div className="jobs-list">
+            <p className="history-note">This browser stores job history. Your server stores the audio.</p>
+            {historyError && <p className="error history-error" role="alert">{historyError}</p>}
+            {jobsLoading && <p className="history-empty" role="status">Loading recent jobs...</p>}
+            {!jobsLoading && !historyError && jobs.length === 0 && (
+              <div className="history-empty"><p>No recent jobs</p></div>
+            )}
+            <div className="history-list">
               {jobs.slice().reverse().slice(0, 10).map((job) => (
-                <div key={job.id} className="job-card-small">
-                  <div className="job-header">
-                    <span className="job-filename">{job.filename}</span>
-                    <div className="job-header-right">
+                <article key={job.id} className="history-job">
+                  <div className="history-job-header">
+                    <Icon name="file" />
+                    <h3 className="job-filename">{job.filename}</h3>
+                    <div className="history-job-actions">
                       {job.processing_time && (
-                        <span className="job-time">⏱️ {job.processing_time}</span>
+                        <span className="job-time">{job.processing_time}</span>
                       )}
-                      <span className={`job-status status-${job.status}`}>
-                        {job.status}
-                      </span>
-                      <button 
-                        className="delete-job-button" 
-                        onClick={() => handleDeleteJob(job.id)}
-                        title="Delete job"
-                      >
-                        🗑️
+                      <span className={`job-status status-${job.status}`}>{job.status}</span>
+                      <button type="button" className="remove-job-button" onClick={() => handleDeleteJob(job.id)}
+                        aria-label={`Remove ${job.filename} from history`} title="Remove from history">
+                        <Icon name="trash" />
                       </button>
                     </div>
                   </div>
                   {job.status === 'completed' && job.output_files && (
-                    <div className="stem-buttons-small">
+                    <div className="history-downloads">
                       {Object.keys(job.output_files).map((stem) => (
-                        <button
-                          key={stem}
-                          onClick={() => handleDownload(job.id, stem)}
-                          className="stem-button-small"
-                        >
-                          {stem}
+                        <button type="button" key={stem} onClick={() => handleDownload(job.id, stem)}
+                          aria-label={`Download ${stem} from ${job.filename}`}>
+                          <Icon name="download" /> {stemLabel(stem)}
                         </button>
                       ))}
                     </div>
                   )}
-                </div>
+                </article>
               ))}
             </div>
-          </div>
-        )}
+          </section>
+        </div>
       </main>
 
       <footer className="App-footer">
-        <p>Powered by Demucs | Backend: Go | Frontend: React</p>
+        <p>Powered by Demucs</p>
+        <a href="https://github.com/mbianchidev/track2stem" target="_blank" rel="noreferrer">View on GitHub <Icon name="arrow" /></a>
       </footer>
     </div>
   );

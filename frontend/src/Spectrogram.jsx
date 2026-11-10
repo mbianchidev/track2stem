@@ -1,123 +1,137 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
-const Spectrogram = ({ audioUrl, audioFile, title, height = 100 }) => {
+const WAVEFORM_ERROR = 'Waveform unavailable. You can still process or download the audio.';
+
+const Spectrogram = ({ audioUrl, audioFile, title, label, height = 100 }) => {
   const canvasRef = useRef(null);
+  const [channelData, setChannelData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const hasDrawnRef = useRef(false);
 
-  const drawWaveform = useCallback(async () => {
-    if (!audioUrl && !audioFile) return;
-    if (hasDrawnRef.current && !audioFile) return; // Don't redraw for URLs once drawn
-    
-    setIsLoading(true);
+  useEffect(() => {
+    let active = true;
+    let audioContext;
+    let closing = false;
+    const controller = new AbortController();
+
+    const closeContext = () => {
+      if (!audioContext || closing) return;
+      closing = true;
+      audioContext.close().catch((err) => console.warn('Could not close waveform audio context:', err));
+    };
+
+    setChannelData(null);
     setError(null);
-    
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      let arrayBuffer;
-      
-      if (audioFile) {
-        // Read from File object
-        arrayBuffer = await audioFile.arrayBuffer();
-      } else {
-        // Fetch from URL
-        const response = await fetch(audioUrl);
-        if (!response.ok) throw new Error('Failed to fetch audio');
-        arrayBuffer = await response.arrayBuffer();
+    if (!audioUrl && !audioFile) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const loadAudio = async () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) throw new Error('This browser does not support Web Audio');
+        audioContext = new AudioContext();
+
+        let arrayBuffer;
+        if (audioFile) {
+          arrayBuffer = await audioFile.arrayBuffer();
+        } else {
+          const response = await fetch(audioUrl, { signal: controller.signal });
+          if (!response.ok) throw new Error(`Could not fetch waveform audio (HTTP ${response.status})`);
+          arrayBuffer = await response.arrayBuffer();
+        }
+
+        if (!active) return;
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const samples = audioBuffer.getChannelData(0);
+        if (samples.length === 0) throw new Error('Decoded audio contains no samples');
+        if (active) setChannelData(samples);
+      } catch (err) {
+        if (active) {
+          console.error('Waveform error:', err);
+          setError(WAVEFORM_ERROR);
+        }
+      } finally {
+        closeContext();
+        if (active) setIsLoading(false);
       }
-      
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const channelData = audioBuffer.getChannelData(0);
-      
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
+    };
+
+    loadAudio();
+    return () => {
+      active = false;
+      controller.abort();
+      closeContext();
+    };
+  }, [audioUrl, audioFile]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !channelData) return;
+
+    const drawWaveform = () => {
       const ctx = canvas.getContext('2d');
-      const width = canvas.width;
-      const canvasHeight = canvas.height;
+      if (!ctx) {
+        console.error('Waveform error: the browser could not create a 2D canvas context');
+        setError(WAVEFORM_ERROR);
+        return;
+      }
+
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.round((canvas.getBoundingClientRect().width || 600) * pixelRatio));
+      const canvasHeight = Math.round(height * pixelRatio);
+      canvas.width = width;
+      canvas.height = canvasHeight;
       const centerY = canvasHeight / 2;
-      
-      // Get theme colors from CSS variables
-      const computedStyle = getComputedStyle(document.documentElement);
-      const bgColor = computedStyle.getPropertyValue('--color-bg-primary').trim() || '#0a0b0f';
-      const accentPrimary = computedStyle.getPropertyValue('--color-accent-primary').trim() || '#00d4aa';
-      const accentSecondary = computedStyle.getPropertyValue('--color-accent-secondary').trim() || '#00f5c4';
-      
-      // Clear canvas with dark background matching theme
-      ctx.fillStyle = bgColor;
+      const halfHeight = Math.max(0, centerY - 4 * pixelRatio);
+      const theme = getComputedStyle(document.documentElement);
+      ctx.fillStyle = theme.getPropertyValue('--color-bg-primary').trim() || '#15171a';
       ctx.fillRect(0, 0, width, canvasHeight);
-      
-      // Draw center line
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = theme.getPropertyValue('--color-border').trim() || '#343a43';
+      ctx.lineWidth = pixelRatio;
       ctx.beginPath();
       ctx.moveTo(0, centerY);
       ctx.lineTo(width, centerY);
       ctx.stroke();
-      
-      // Calculate samples per pixel
-      const samplesPerPixel = Math.floor(channelData.length / width);
-      
-      // Create gradient for waveform using theme colors
-      const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-      gradient.addColorStop(0, accentPrimary);
-      gradient.addColorStop(0.5, accentSecondary);
-      gradient.addColorStop(1, accentPrimary);
-      
-      ctx.fillStyle = gradient;
-      
-      // Draw waveform bars (like the screenshot)
-      for (let x = 0; x < width; x++) {
-        const startSample = x * samplesPerPixel;
-        const endSample = Math.min(startSample + samplesPerPixel, channelData.length);
-        
-        // Find min and max in this segment
-        let min = 0;
-        let max = 0;
-        for (let i = startSample; i < endSample; i++) {
-          const sample = channelData[i];
-          if (sample < min) min = sample;
-          if (sample > max) max = sample;
-        }
-        
-        // Scale to canvas height with some padding
-        const amplitude = Math.max(Math.abs(min), Math.abs(max));
-        const barHeight = amplitude * (canvasHeight - 10);
-        
-        // Draw symmetric bar from center
-        const topY = centerY - barHeight;
-        const bottomY = centerY + barHeight;
-        
-        ctx.fillRect(x, topY, 1, bottomY - topY);
-      }
-      
-      audioContext.close();
-      hasDrawnRef.current = true;
-      
-    } catch (err) {
-      console.error('Waveform error:', err);
-      setError('Could not generate waveform');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [audioUrl, audioFile]);
+      ctx.fillStyle = theme.getPropertyValue('--color-accent-primary').trim() || '#f28c38';
 
-  useEffect(() => {
+      for (let x = 0; x < width; x++) {
+        const start = Math.floor(x * channelData.length / width);
+        const end = Math.min(channelData.length, Math.max(start + 1, Math.floor((x + 1) * channelData.length / width)));
+        let amplitude = 0;
+        for (let sample = start; sample < end; sample++) {
+          amplitude = Math.max(amplitude, Math.abs(channelData[sample]));
+        }
+        const barHeight = Math.min(1, amplitude) * halfHeight;
+        ctx.fillRect(x, centerY - barHeight, 1, barHeight * 2);
+      }
+    };
+
     drawWaveform();
-  }, [drawWaveform]);
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(drawWaveform);
+      observer.observe(canvas);
+      return () => observer.disconnect();
+    }
+    window.addEventListener('resize', drawWaveform);
+    return () => window.removeEventListener('resize', drawWaveform);
+  }, [channelData, height]);
 
   return (
     <div className="spectrogram-container">
       {title && <p className="spectrogram-title">{title}</p>}
-      {isLoading && <div className="spectrogram-loading">Generating waveform...</div>}
-      {error && <div className="spectrogram-error">{error}</div>}
-      <canvas 
-        ref={canvasRef} 
-        width={600} 
+      {isLoading && <div className="spectrogram-loading" role="status">Generating waveform...</div>}
+      {error && <div className="spectrogram-error" role="status">{error}</div>}
+      <canvas
+        ref={canvasRef}
+        width={600}
         height={height}
+        role="img"
+        aria-label={label || title || 'Audio waveform'}
         className="spectrogram-canvas"
-        style={{ display: isLoading || error ? 'none' : 'block' }}
+        style={{ height: `${height}px`, display: isLoading || error ? 'none' : 'block' }}
       />
     </div>
   );

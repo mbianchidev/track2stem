@@ -70,6 +70,8 @@ npm run build
 
 The build writes `frontend/dist/`. There is no separate lint script in the current package manifest. API URL behavior is documented in [configuration](configuration.md#service-configuration).
 
+Frontend tests use mocked API responses and synthetic audio only. `App.test.jsx` covers upload options, validation, job states, persistence, progress, and history actions; `Spectrogram.test.jsx` covers waveform source changes, responsive canvas sizing, decoding failures, and audio-context cleanup.
+
 ## Backend checks
 
 From the repository root, with the matching Go toolchain:
@@ -139,6 +141,6 @@ Nginx serves the production frontend and proxies `/api` to the backend. Vite use
 
 ## Documentation screenshot
 
-[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows a generated WAV selected in the upload form with its browser-rendered waveform. The jobs-list response was mocked as empty to isolate the UI capture from backend state; no upload or model inference was performed.
+[The README screenshot](images/track2stem.png) is captured from the real frontend in headless Chromium. It shows the graphite-and-orange interface, a generated WAV selected in **Source audio**, its browser-rendered waveform, and the adjacent **Separation settings** panel. The jobs-list response was mocked as empty to isolate the UI capture from backend state; no upload or model inference was performed.
 
-To refresh it, run the frontend locally, use a fresh browser context, select generated audio with a neutral filename, wait for the waveform and fonts to finish rendering, and capture the unmodified interface. Do not use personal audio, production jobs, or fabricated completed-job results.
+To refresh it, run the frontend locally, use a fresh browser context at a 1440 px desktop width, select generated audio with a neutral filename, wait for the waveform, fonts, and control transitions to finish rendering, and capture the full unmodified interface. Do not use personal audio, production jobs, or fabricated completed-job results.
