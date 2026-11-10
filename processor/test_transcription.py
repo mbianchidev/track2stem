@@ -54,6 +54,7 @@ def test_repeated_attacks_do_not_discard_a_sustained_pitch(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("pitch", [21, 23])
+@pytest.mark.filterwarnings("error::RuntimeWarning")
 def test_clean_bassline_keeps_extended_range_and_preserves_octave_candidates(tmp_path, monkeypatch, pitch):
     class Model:
         def run(self, _names, _inputs):

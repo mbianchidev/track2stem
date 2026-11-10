@@ -107,7 +107,8 @@ def pitch_evidence_windows(source, sample_rate, minimum_hz, cancelled=None, mini
             chunk = chunk.mean(axis=1)
         if np.max(np.abs(chunk), initial=0) < minimum_peak:
             continue
-        mono = librosa.resample(chunk, orig_sr=sample_rate, target_sr=target_rate)
+        # Avoid an order-dependent float64-to-float32 cast in Librosa's lazy Numba abs2 loop.
+        mono = librosa.resample(np.asarray(chunk, dtype=np.float64), orig_sr=sample_rate, target_sr=target_rate)
         pitch = librosa.yin(mono, sr=target_rate, fmin=minimum_hz, fmax=500,
                             frame_length=4096, hop_length=hop)
         rms = librosa.feature.rms(y=mono, frame_length=4096, hop_length=hop)[0]
