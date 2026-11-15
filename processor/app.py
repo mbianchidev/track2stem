@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 
 from track2stem_engine.audio import CancelledError
 from track2stem_engine.engine import Engine
+from track2stem_engine.errors import InvalidInputError, UserFacingError
 from track2stem_engine.settings import (
     ALLOWED_CLIP_MODES, ALLOWED_EXTENSIONS, ALLOWED_MODELS, ALLOWED_OUTPUT_FORMATS,
     ALLOWED_OVERLAPS, ALLOWED_SEGMENTS, ALLOWED_SHIFTS, ALLOWED_STEMS,
@@ -51,6 +52,13 @@ def error_response(message, status):
     if message == "Invalid model":
         body["allowed_models"] = sorted(ALLOWED_DEMUCS_MODELS)
     return jsonify(body), status
+
+
+def public_message(error, fallback):
+    if isinstance(error, UserFacingError):
+        return error.public_message
+    logger.warning("Returning a generic error instead of internal details", exc_info=error)
+    return fallback
 
 
 @app.errorhandler(413)
@@ -100,27 +108,28 @@ def execute(job_id, settings, prepare_source):
                 "progress": progress, "stage": stage, "elapsed": f"{elapsed}s",
             }
 
+    def fail(status, message, code):
+        with process_lock:
+            processing_status[job_id] = {"status": status, "progress": 0, "stage": message}
+        return error_response(message, code)
+
     source = None
     try:
         source = prepare_source(cancelled)
         result = get_engine().run(source, job_id, settings, report, cancelled)
         result["format"] = settings.output_format
         return jsonify(result)
-    except CancelledError as error:
-        with process_lock:
-            processing_status[job_id] = {"status": "cancelled", "progress": 0, "stage": str(error)}
-        return error_response(str(error), 409)
+    except CancelledError:
+        return fail("cancelled", "Cancelled by user", 409)
     except ValueError as error:
-        with process_lock:
-            processing_status[job_id] = {"status": "failed", "progress": 0, "stage": str(error)}
-        return error_response(str(error), 400)
+        return fail("failed", public_message(error, "The audio or settings could not be processed"), 400)
     except FileExistsError:
         return error_response("This job already has output; submit a new job ID", 409)
-    except (OSError, RuntimeError, TimeoutError, ImportError) as error:
+    except UserFacingError as error:
+        return fail("failed", error.public_message, 500)
+    except (OSError, RuntimeError, TimeoutError, ImportError):
         logger.exception("Processing failed for %s", job_id)
-        with process_lock:
-            processing_status[job_id] = {"status": "failed", "progress": 0, "stage": "Processing failed"}
-        return error_response(f"Local processing failed: {error}", 500)
+        return fail("failed", "Local processing failed; check the processor logs", 500)
     finally:
         with process_lock:
             active_jobs.pop(job_id, None)
@@ -141,7 +150,7 @@ def process_audio():
     try:
         settings = Settings.from_mapping(request.form)
     except ValueError as error:
-        return error_response(str(error), 400)
+        return error_response(public_message(error, "Invalid processing settings"), 400)
     file = request.files["file"]
     filename = secure_filename(file.filename or "")
     if not filename:
@@ -159,7 +168,7 @@ def process_audio():
                 owned = True
                 file.save(target)
             if path.stat().st_size > 100 * 1024 * 1024:
-                raise ValueError("File is too large. Maximum allowed size is 100 MiB.")
+                raise InvalidInputError("File is too large. Maximum allowed size is 100 MiB.")
             return path
         except BaseException:
             if owned:
@@ -180,10 +189,10 @@ def import_audio():
         url = canonical_youtube_url(values.get("url"))
         raw_settings = values.get("settings", {})
         if not isinstance(raw_settings, dict):
-            raise ValueError("Settings must be a JSON object")
+            raise InvalidInputError("Settings must be a JSON object")
         settings = Settings.from_mapping(raw_settings)
     except ValueError as error:
-        return error_response(str(error), 400)
+        return error_response(public_message(error, "Provide a valid job ID and YouTube URL"), 400)
     job_id = values["job_id"]
 
     def prepare_source(cancelled):
@@ -210,7 +219,7 @@ def remix_job(job_id):
     except FileNotFoundError:
         return error_response("Stored stems are missing; separate the source again", 404)
     except ValueError as error:
-        return error_response(str(error), 400)
+        return error_response(public_message(error, "Invalid remix gains"), 400)
     except (OSError, RuntimeError, TimeoutError):
         logger.exception("Remix failed for %s", job_id)
         return error_response("Mix export failed; the previous outputs are still available", 500)

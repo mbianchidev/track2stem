@@ -6,6 +6,7 @@ from functools import lru_cache
 import numpy as np
 
 from .audio import check_cancelled
+from .errors import InvalidInputError
 from .models import ensure_model
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ def detect_rhythm(audio, sample_rate, model_dir, report, cancelled):
             accents.append(strength)
         report(76 + int(2 * last / len(mono)), "Tracking beats, downbeats and meter changes")
     if len(beats) < 2:
-        raise ValueError("No reliable beat grid found; try a recording with a clearer pulse")
+        raise InvalidInputError("No reliable beat grid found; try a recording with a clearer pulse")
     meter = decode_meter(beats, probabilities, accents)
     intervals = np.diff(beats)
     points = []
@@ -125,7 +126,7 @@ def detect_rhythm(audio, sample_rate, model_dir, report, cancelled):
         interval = float(np.median(intervals[max(0, index - 2):min(len(intervals), index + 3)]))
         bpm = round(60 * pulse_quarters / interval, 2)
         if not 20 <= bpm <= 400:
-            raise ValueError("Detected quarter-note tempo is outside the supported 20-400 BPM range")
+            raise InvalidInputError("Detected quarter-note tempo is outside the supported 20-400 BPM range")
         if not points or beat - points[-1]["time"] >= 2 or (active and abs(beat - active["time"]) < .03):
             points.append({"time": round(beat, 6) if points else 0, "bpm": bpm})
     return {

@@ -6,6 +6,7 @@ import numpy as np
 from scipy.signal import find_peaks
 
 from .audio import check_cancelled
+from .errors import InvalidInputError
 from .tuning import estimate_tuning
 
 logger = logging.getLogger(__name__)
@@ -156,7 +157,7 @@ def analyze(audio, sample_rate, stems=None, cancelled=None, model_dir=None, repo
         raise ValueError("Analysis needs non-empty, finite audio")
     mono = librosa.resample(audio.mean(axis=1), orig_sr=sample_rate, target_sr=RATE)
     if np.max(np.abs(mono)) < 1e-6:
-        raise ValueError("Cannot analyze silent audio")
+        raise InvalidInputError("Cannot analyze silent audio")
     if model_dir is not None:
         from .rhythm import detect_rhythm
         rhythm = detect_rhythm(audio, sample_rate, model_dir, report or (lambda *_: None), cancelled)
@@ -169,7 +170,7 @@ def analyze(audio, sample_rate, stems=None, cancelled=None, model_dir=None, repo
         beats = librosa.frames_to_time(beat_frames, sr=RATE, hop_length=HOP)
         beats = beats[beats < len(mono) / RATE]
         if len(beats) < 2:
-            raise ValueError("No reliable beat grid found; try a recording with a clearer pulse")
+            raise InvalidInputError("No reliable beat grid found; try a recording with a clearer pulse")
         rhythm = {
             "bpm": round(float(np.median(tempos)), 2),
             "tempo_changes": [{"time": round(float(index * HOP / RATE), 3), "bpm": round(float(tempos[index]), 2)}

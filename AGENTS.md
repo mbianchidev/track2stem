@@ -55,6 +55,7 @@ For processor tests, use the isolated setup and command in the [processor test g
 - Follow existing components, handlers, validation allowlists, filename sanitization, and safe-path helpers.
 - Before upgrading processor Python, complete the [Python upgrade gate](docs/development.md#python-upgrade-gate). Require compatible stable CPU wheels, full installation, and real inference evidence; Flask tests and startup health alone are insufficient.
 - Preserve type safety where applicable; report errors clearly and clean up owned resources.
+- Raise `InvalidInputError` or `SourceUnavailableError` from `track2stem_engine.errors` only for curated messages users can act on. The Flask adapter returns those messages and logs other exceptions behind generic responses, so never return `str(error)`.
 - Use synthetic fixtures only. Never include private audio, credentials, or customer data in tests or screenshots.
 - Run focused checks and update affected docs. Health checks and current processor validation tests do not prove model inference succeeds.
 - Avoid destructive volume cleanup: `make clean` and `docker compose down --volumes` delete stored audio.

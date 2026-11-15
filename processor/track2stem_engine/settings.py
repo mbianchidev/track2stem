@@ -5,6 +5,8 @@ import re
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
+from .errors import InvalidInputError
+
 JOB_ID_PATTERN = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9\-]{0,254}")
 ALLOWED_MODELS = frozenset({
     "htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi",
@@ -41,7 +43,7 @@ def parse_flag(value):
         return True
     if value in (False, "false", "0", 0, None, ""):
         return False
-    raise ValueError("Feature flags must be true or false")
+    raise InvalidInputError("Feature flags must be true or false")
 
 
 @dataclass(frozen=True)
@@ -89,15 +91,15 @@ class Settings:
                     options[name] = (None if name in {"segment", "overlap"} and value in ("", None)
                                      else float(value) if name == "overlap" else int(value))
                 except (TypeError, ValueError, OverflowError) as error:
-                    raise ValueError(f"Invalid {name} value") from error
+                    raise InvalidInputError(f"Invalid {name} value") from error
                 if isinstance(value, bool) or (
                     isinstance(value, float) and name != "overlap" and value != options[name]
                 ):
-                    raise ValueError(f"Invalid {name} value")
+                    raise InvalidInputError(f"Invalid {name} value")
             elif isinstance(value, str):
                 options[name] = value.lower()
             else:
-                raise ValueError(f"Invalid {name} value")
+                raise InvalidInputError(f"Invalid {name} value")
         settings = cls(**options)
         checks = (
             (settings.model in ALLOWED_MODELS, "Invalid model"),
@@ -115,7 +117,7 @@ class Settings:
         )
         for valid, message in checks:
             if not valid:
-                raise ValueError(message)
+                raise InvalidInputError(message)
         return settings
 
 
@@ -124,14 +126,14 @@ def validate_gains(values, stems):
         try:
             values = json.loads(values)
         except json.JSONDecodeError as error:
-            raise ValueError("Gains must be a JSON object") from error
+            raise InvalidInputError("Gains must be a JSON object") from error
     if not isinstance(values, dict) or set(values) - set(stems):
-        raise ValueError("Gains must name only this job's instruments")
+        raise InvalidInputError("Gains must name only this job's instruments")
     result = dict.fromkeys(stems, 1.0)
     for stem, value in values.items():
         if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"Invalid gain for {stem}")
+            raise InvalidInputError(f"Invalid gain for {stem}")
         if not math.isfinite(value) or not 0 <= value <= 4:
-            raise ValueError(f"Gain for {stem} must be between 0 and 4 (0-400%)")
+            raise InvalidInputError(f"Gain for {stem} must be between 0 and 4 (0-400%)")
         result[stem] = float(value)
     return result

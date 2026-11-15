@@ -6,6 +6,7 @@ import numpy as np
 from scipy import signal
 
 from .audio import check_cancelled
+from .errors import InvalidInputError
 from .vocal_model import get_vocal_separator
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def split_vocals(audio, sample_rate, model_dir, report, cancelled, details=None,
         raise ValueError("TRACK2STEM_VOCAL_METHOD must be auto, neural or spatial")
     sample = _spatial_sample(audio) if selected != "neural" else None
     if selected == "spatial" and sample is None:
-        raise ValueError("Spatial vocal separation requires independent stereo channels; use the neural method for mono")
+        raise InvalidInputError("Spatial vocal separation requires independent stereo channels; use the neural method for mono")
     if sample is not None:
         lead, backing, metadata = _spatial_separation(audio, sample, report, cancelled)
         if details is not None:

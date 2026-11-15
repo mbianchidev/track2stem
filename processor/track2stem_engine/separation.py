@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .audio import check_cancelled, read_audio
+from .errors import InvalidInputError
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class Separator:
             default = model.models[0].segment
         segment = settings.segment or min(default, maximum)
         if segment > maximum:
-            raise ValueError(f"{settings.model} supports segments up to {maximum:g}s; use Default, 5s or 7s")
+            raise InvalidInputError(f"{settings.model} supports segments up to {maximum:g}s; use Default, 5s or 7s")
         length = max(1, int(segment * sample_rate))
         overlap = settings.overlap if settings.overlap is not None else .25
         stride = max(1, int(length * (1 - overlap)))
@@ -52,7 +53,7 @@ class Separator:
         deviation = float(reference.std())
         mean = float(reference.mean())
         if deviation < 1e-8:
-            raise ValueError("Source audio is silent; select audible audio")
+            raise InvalidInputError("Source audio is silent; select audible audio")
         normalized = torch.from_numpy(((audio - mean) / deviation).T.copy())
         combined = np.zeros((len(model.sources), len(audio), 2), dtype=np.float32)
         total_weights = np.zeros(len(audio), dtype=np.float32)
