@@ -4,6 +4,8 @@
 
 Track2stem is a self-hosted web application for musicians and audio enthusiasts who want separate vocal and instrument tracks for practice, remixing, or transcription. Upload audio, choose a Demucs model, and download all available stems or one isolated instrument with a backing track.
 
+Also available as a VST.
+
 [Documentation](docs/README.md) | [DAW plugin](docs/native-plugin.md) | [Report a bug](https://github.com/mbianchidev/track2stem/issues) | [Roadmap](docs/roadmap.md)
 
 ![Track2stem studio workspace with a generated source waveform, separation settings, and output area](docs/images/track2stem.png)
