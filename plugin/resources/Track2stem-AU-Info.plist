@@ -14,8 +14,8 @@
   <key>CFBundleIdentifier</key><string>dev.track2stem.audiounit.Track2stem</string>
   <key>CFBundleName</key><string>Track2stem</string>
   <key>CFBundlePackageType</key><string>BNDL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>0.1.1</string>
+  <key>CFBundleVersion</key><string>0.1.1</string>
   <key>CFBundleSignature</key><string>T2St</string>
   <key>NSPrincipalClass</key><string>Track2stem_View</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(Track2stem VERSION 0.1.0 LANGUAGES C CXX OBJC OBJCXX)
+project(Track2stem VERSION 0.1.1 LANGUAGES C CXX OBJC OBJCXX)
 
 if(NOT APPLE)
   message(FATAL_ERROR "The initial plugin target is macOS Apple Silicon.")
