@@ -36,7 +36,7 @@ Use `http://localhost:8080/api` directly or `/api` through the frontend's Nginx 
 | `workers` | `1` | Integers 1 through 4, within the processor's CPU count |
 | `analysis`, `click_track`, `lyrics`, `guitar_tabs`, `bass_tabs`, `drum_tabs`, `split_vocals` | `false` | `true`/`false` or `1`/`0`; see [practice tools](usage.md#practice-tools) |
 
-The processor validates numeric options and model/stem compatibility. A backend upload can return a job record before a later processor validation failure, which then appears in the job's `error`.
+The processor validates numeric options and model/stem compatibility. A backend upload can return a job record before a later processor validation failure, which then appears in the job's `error`. Correctable problems such as invalid settings, silent audio or unavailable YouTube videos return a specific message. Internal failures return a generic message, and their details are written to the processor log only.
 
 ## Imports, mixes and practice downloads
 

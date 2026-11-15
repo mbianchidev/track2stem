@@ -6,19 +6,20 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from .audio import check_cancelled, ffmpeg
+from .errors import InvalidInputError, SourceUnavailableError
 
 logger = logging.getLogger(__name__)
 
 
 def canonical_youtube_url(value):
     if not isinstance(value, str) or len(value) > 2048:
-        raise ValueError("Provide a single HTTPS YouTube video URL")
+        raise InvalidInputError("Provide a single HTTPS YouTube video URL")
     try:
         parsed = urlsplit(value)
         if parsed.scheme != "https" or parsed.username is not None or parsed.port is not None:
             raise ValueError("Use an HTTPS YouTube URL without credentials or a port")
     except ValueError as error:
-        raise ValueError("Invalid YouTube video URL") from error
+        raise InvalidInputError("Invalid YouTube video URL") from error
     video = ""
     if parsed.hostname == "youtu.be":
         video = parsed.path.removeprefix("/")
@@ -28,7 +29,7 @@ def canonical_youtube_url(value):
         elif parsed.path.startswith("/shorts/"):
             video = parsed.path.removeprefix("/shorts/")
     if re.fullmatch(r"[a-zA-Z0-9_-]{11}", video) is None:
-        raise ValueError("Provide a single YouTube video, not a playlist or another website")
+        raise InvalidInputError("Provide a single YouTube video, not a playlist or another website")
     return f"https://www.youtube.com/watch?v={video}"
 
 
@@ -43,9 +44,9 @@ def download_youtube(url, directory, cancelled):
     def progress(info):
         check_cancelled(cancelled)
         if time.monotonic() > deadline:
-            raise TimeoutError("YouTube import timed out after 10 minutes")
+            raise SourceUnavailableError("YouTube import timed out after 10 minutes")
         if info.get("downloaded_bytes", 0) > 100 * 1024 * 1024:
-            raise ValueError("YouTube audio exceeds the 100 MiB download limit")
+            raise InvalidInputError("YouTube audio exceeds the 100 MiB download limit")
 
     def match(info, *, incomplete=False):
         check_cancelled(cancelled)
@@ -73,9 +74,9 @@ def download_youtube(url, directory, cancelled):
     except yt_dlp.utils.DownloadError as error:
         check_cancelled(cancelled)
         logger.error("YouTube import failed: %s", error)
-        raise RuntimeError("YouTube import failed. The video may be unavailable, restricted, or require an extractor update. Upload a local audio file instead.") from error
+        raise SourceUnavailableError("YouTube import failed. The video may be unavailable, restricted, or require an extractor update. Upload a local audio file instead.") from error
     check_cancelled(cancelled)
     path = directory / "source.wav"
     if not info or not path.is_file() or path.stat().st_size == 0:
-        raise RuntimeError("YouTube import produced no audio. Check the duration/size limits or upload a local file.")
+        raise SourceUnavailableError("YouTube import produced no audio. Check the duration/size limits or upload a local file.")
     return path

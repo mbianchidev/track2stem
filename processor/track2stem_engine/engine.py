@@ -14,6 +14,7 @@ import soundfile as sf
 
 from . import CONTRACT_VERSION
 from .audio import check_cancelled, read_audio, write_audio
+from .errors import InvalidInputError
 from .settings import ALLOWED_EXTENSIONS, Settings, safe_join, validate_gains, validate_job_id
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class Engine:
         created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         source = Path(source).resolve()
         if not source.is_file() or source.suffix.lower().lstrip(".") not in ALLOWED_EXTENSIONS:
-            raise ValueError("Select an existing, supported audio file")
+            raise InvalidInputError("Select an existing, supported audio file")
         report = report or (lambda progress, stage: logger.info("%s: %s%% %s", job_id, progress, stage))
         cancelled = cancelled or threading.Event()
         job_dir = self._job_dir(job_id)
@@ -212,7 +213,7 @@ class Engine:
         path = self._job_dir(job_id) / "job.json"
         manifest = json.loads(path.read_text(encoding="utf-8"))
         if manifest.get("version") != CONTRACT_VERSION:
-            raise ValueError("This job uses an unsupported contract version")
+            raise InvalidInputError("This job uses an unsupported contract version")
         for path in (*manifest["outputs"].values(), *manifest["artifacts"].values()):
             resolved = Path(safe_join(self._job_dir(job_id), path))
             if not resolved.is_file():

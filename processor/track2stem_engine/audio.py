@@ -9,6 +9,8 @@ from threading import Event
 import numpy as np
 import soundfile as sf
 
+from .errors import InvalidInputError
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,7 +88,7 @@ def read_audio(path, cancelled=None, sample_rate=44100):
         ], cancelled)
         info = sf.info(decoded)
         if not 0 < info.duration <= 3600:
-            raise ValueError("Audio must be non-empty and no longer than 60 minutes")
+            raise InvalidInputError("Audio must be non-empty and no longer than 60 minutes")
         audio, rate = sf.read(decoded, dtype="float32", always_2d=True)
     if not np.isfinite(audio).all():
         raise ValueError("Audio contains non-finite samples")

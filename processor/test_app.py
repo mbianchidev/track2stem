@@ -19,6 +19,7 @@ from app import (
     ALLOWED_OVERLAPS,
     SIX_STEM_MODELS,
 )
+from track2stem_engine.errors import InvalidInputError, SourceUnavailableError
 
 
 class TestValidateJobId:
@@ -337,6 +338,37 @@ class TestEndpointValidation:
         assert resp.status_code == 400
         body = json.loads(resp.data)
         assert body['error'] == 'Incompatible isolate_stem for selected model'
+
+
+class TestErrorExposure:
+    """Only user-facing engine messages reach clients."""
+
+    @pytest.mark.parametrize(('error', 'status', 'message'), [
+        (InvalidInputError('Source audio is silent; select audible audio'), 400,
+         'Source audio is silent; select audible audio'),
+        (SourceUnavailableError('YouTube import produced no audio. Upload a local file.'), 500,
+         'YouTube import produced no audio. Upload a local file.'),
+        (ValueError('Path traversal detected: /srv/private escapes /srv/outputs'), 400,
+         'The audio or settings could not be processed'),
+        (OSError("[Errno 13] Permission denied: '/srv/private/model.th'"), 500,
+         'Local processing failed; check the processor logs'),
+    ])
+    def test_process_hides_internal_error_details(self, monkeypatch, error, status, message):
+        class FailingEngine:
+            def run(self, *_args):
+                raise error
+
+        monkeypatch.setattr('app.get_engine', FailingEngine)
+        app.config['TESTING'] = True
+        with app.test_client() as client:
+            resp = client.post(
+                '/process',
+                data={'job_id': 'synthetic-error', 'file': (io.BytesIO(b'synthetic'), 'synthetic.wav')},
+                content_type='multipart/form-data',
+            )
+            assert resp.status_code == status
+            assert resp.get_json() == {'error': message}
+            assert client.get('/status/synthetic-error').get_json()['stage'] == message
 
 
 class TestModelStemMapping:
