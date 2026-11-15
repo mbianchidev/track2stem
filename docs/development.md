@@ -172,7 +172,7 @@ python -m pip install -r requirements-test.txt
 python -m pytest -q
 ```
 
-The tests cover validation/path safety, real FFmpeg exports and per-instrument remixes, variable-tempo synthetic clicks, complementary vocal windows, note re-attacks, MusicXML/MIDI timing, lyrics/subtitles, safe video imports and the Flask adapter. `conftest.py` redirects web storage to temporary directories. Mocked model outputs do not establish separation/transcription quality or native runtime compatibility; real inference remains a separate requirement.
+The tests cover validation/path safety, checksum-verified model mirror fallback, real FFmpeg exports and per-instrument remixes, variable-tempo synthetic clicks, complementary vocal windows, note re-attacks, MusicXML/MIDI timing, lyrics/subtitles, safe video imports and the Flask adapter. `conftest.py` redirects web storage to temporary directories. Mocked model outputs do not establish separation/transcription quality or native runtime compatibility; real inference remains a separate requirement.
 
 CI promotes numeric `RuntimeWarning` diagnostics to errors. Pitch evidence uses bounded float64 YIN input so Librosa's lazily specialized Numba complex-magnitude loop cannot introduce an order-dependent float64-to-float32 output cast. To verify a cold JIT cache without removing any shared/user cache, set `NUMBA_CACHE_DIR` to a new temporary directory and run `python -m pytest -q -W error::RuntimeWarning`. Native release identity/checksum tests run with `python -m unittest discover -s plugin/tests -p test_release.py` from the repository root.
 

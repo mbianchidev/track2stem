@@ -19,6 +19,7 @@ class ModelSpec:
     sha256: str
     filename: str
     max_bytes: int = 200 * 1024 * 1024
+    mirrors: tuple[str, ...] = ()
 
 
 MODELS = {
@@ -31,6 +32,7 @@ MODELS = {
         "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/small0.ckpt",
         "6074be2c4d490c5f6101fcc374a1ec72ae93456e23bb6019783b849f5dc7d47b",
         "beat-small.ckpt",
+        mirrors=("https://f0k.de/pubs/2024_ismir/beat_this-small0.ckpt",),
     ),
     "drum-str": ModelSpec(
         "https://huggingface.co/Pierfrancesco/adt-str/resolve/a33c5c6b191a4ca1e0f6dc22140947485eb36ce8/setting-tau-0.8/model.safetensors",
@@ -43,6 +45,20 @@ MODELS = {
         "medleyvox-vocals.pth", max_bytes=300 * 1024 * 1024,
     ),
 }
+
+
+def _download(name, url, specification, temporary, cancelled):
+    digest = hashlib.sha256()
+    with urllib.request.urlopen(url, timeout=30) as response, temporary.open("xb") as output:
+        total = 0
+        while chunk := response.read(1024 * 1024):
+            check_cancelled(cancelled)
+            total += len(chunk)
+            if total > specification.max_bytes:
+                raise RuntimeError(f"{name} model exceeded its download size limit")
+            digest.update(chunk)
+            output.write(chunk)
+    return digest.hexdigest()
 
 
 def ensure_model(name, model_dir, report, cancelled):
@@ -59,28 +75,27 @@ def ensure_model(name, model_dir, report, cancelled):
     if os.environ.get("TRACK2STEM_OFFLINE") == "1":
         raise RuntimeError(f"{name} is not cached. Connect once to download its weights before using offline mode.")
     report(74, f"Downloading {name} model for local CPU processing")
-    temporary = directory / f".{name}-{uuid.uuid4()}.part"
-    digest = hashlib.sha256()
-    try:
+    network_error = None
+    checksum_failed = False
+    for url in (specification.url, *specification.mirrors):
+        temporary = directory / f".{name}-{uuid.uuid4()}.part"
         try:
-            with urllib.request.urlopen(specification.url, timeout=30) as response, temporary.open("xb") as output:
-                total = 0
-                while chunk := response.read(1024 * 1024):
-                    check_cancelled(cancelled)
-                    total += len(chunk)
-                    if total > specification.max_bytes:
-                        raise RuntimeError(f"{name} model exceeded its download size limit")
-                    digest.update(chunk)
-                    output.write(chunk)
-        except (urllib.error.URLError, TimeoutError) as error:
-            logger.error("Model download failed for %s: %s", name, error)
-            raise RuntimeError(f"Could not download {name}. Check internet access and retry; audio stays local.") from error
-        if digest.hexdigest() != specification.sha256:
-            raise RuntimeError(f"{name} model checksum verification failed")
-        temporary.replace(target)
-    finally:
-        temporary.unlink(missing_ok=True)
-    return target
+            try:
+                actual = _download(name, url, specification, temporary, cancelled)
+            except (urllib.error.URLError, TimeoutError) as error:
+                logger.error("Model download failed for %s from %s: %s", name, url, error)
+                network_error = error
+                continue
+            if actual == specification.sha256:
+                temporary.replace(target)
+                return target
+            logger.error("Model checksum verification failed for %s from %s", name, url)
+            checksum_failed = True
+        finally:
+            temporary.unlink(missing_ok=True)
+    if checksum_failed:
+        raise RuntimeError(f"{name} model checksum verification failed")
+    raise RuntimeError(f"Could not download {name}. Check internet access and retry; audio stays local.") from network_error
 
 
 @lru_cache(maxsize=2)
