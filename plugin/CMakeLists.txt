@@ -10,7 +10,6 @@ include(FetchContent)
 FetchContent_Declare(iplug2
   GIT_REPOSITORY https://github.com/iPlug2/iPlug2.git
   GIT_TAG b320ce3b08057635e10d812d1b0773867772d8b6
-  GIT_SHALLOW TRUE
   SOURCE_SUBDIR _track2stem_dependency_only
 )
 FetchContent_MakeAvailable(iplug2)
