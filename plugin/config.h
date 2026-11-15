@@ -1,7 +1,7 @@
 #define PLUG_NAME "Track2stem"
 #define PLUG_MFR "Track2stem"
-#define PLUG_VERSION_HEX 0x00000100
-#define PLUG_VERSION_STR "0.1.0"
+#define PLUG_VERSION_HEX 0x00000101
+#define PLUG_VERSION_STR "0.1.1"
 #define PLUG_UNIQUE_ID 'T2St'
 #define PLUG_MFR_ID 'T2Sm'
 #define PLUG_URL_STR "https://github.com/mbianchidev/track2stem"

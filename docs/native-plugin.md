@@ -93,7 +93,7 @@ python3.14 plugin/tests/check-worker.py \
 Verify a ZIP without installing into your actual Library:
 
 ```bash
-python3.14 plugin/tests/check-package.py plugin/dist/Track2stem-0.1.0-macos-arm64-BUILD.zip
+python3.14 plugin/tests/check-package.py plugin/dist/Track2stem-0.1.1-macos-arm64-BUILD.zip
 ```
 
 Replace `BUILD` with the generated artifact's timestamp. The check extracts into a temporary directory, runs the actual installer twice with an isolated home, and cleans up its own installation afterward.
@@ -121,7 +121,7 @@ Native debugging can override `TRACK2STEM_WORKER`, `TRACK2STEM_DATA_DIR` and `TR
 Maintain the same numeric core version in `plugin/config.h` (`PLUG_VERSION_STR` and `PLUG_VERSION_HEX`) and `plugin/CMakeLists.txt`. Preview the contract without changing files, commits, tags or releases:
 
 ```bash
-python3.14 plugin/release.py --validate-tag v0.1.0
+python3.14 plugin/release.py --validate-tag v0.1.1
 ```
 
 For an explicitly prepared existing tag, manually dispatch the workflow with that tag. Leave `publish=false` for a verified Actions package only. Setting `publish=true` explicitly enables the publishing job. This documentation does not authorize creating a tag or publishing a release.
