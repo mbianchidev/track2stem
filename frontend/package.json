@@ -12,12 +12,12 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
-    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^6.3.0",
     "jsdom": "^31.0.1",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "scripts": {
     "start": "vite --host 0.0.0.0",
